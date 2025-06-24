@@ -16,6 +16,7 @@ ERROR_COLOR = "#ff4444"       # Vermelho para mensagens de erro
 BORDER_COLOR = "#00ff99"      # Cor da borda para elementos importantes
 
 FONT_FAMILY = "Consolas"
+FONT_SUBTITLE = "Consolas"
 
 FONT_TITLE = (FONT_FAMILY, 30, "bold")      # Títulos
 FONT_SUBTITLE = (FONT_FAMILY, 18, "bold")   # Subtítulos

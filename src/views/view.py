@@ -6,7 +6,8 @@ from src.utils.settings import (
     FONT_TITLE, FONT_SUBTITLE, FONT_DEFAULT, FONT_LOG, FONT_HEADING,
     BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, BORDER_RADIUS, GAME_TITLE, MISSION_SIZES
 )
-from src.models.dialogs import TeamSelectionDialog, YesNoDialog
+from src.models.dialogs import TeamSelectionDialog, YesNoDialog, MissionOutcomeDialog, GameOverDetailsDialog
+
 
 class GameView:
     """
@@ -191,6 +192,16 @@ class GameView:
         self.root.update_idletasks()
         self._resize_player_info_canvas(None)
 
+    def show_mission_outcome_dialog(self, success: bool, sabotages_count: int):
+        """
+        Exibe um diálogo modal com o resultado da missão e o número de sabotagens.
+        """
+        if self.local_player_id: # Garante que só clientes de jogador exibam
+            title = "Missão Bem-Sucedida!" if success else "Missão Falhou!"
+            message = "A Resistência obteve sucesso na missão!" if success else f"Os Espiões sabotaram a missão com {sabotages_count} falha(s)!"
+            # Poderíamos usar messagebox, mas um diálogo customizado é mais flexível
+            MissionOutcomeDialog(self.root, title, message)
+
     def _on_action_button_click(self):
         """Callback para o botão de ação principal, com feedback visual."""
         if self.controller:
@@ -288,13 +299,29 @@ class GameView:
         
 
     def show_game_over_dialog(self, winner: str):
-        """Exibe o diálogo final de fim de jogo."""
-        if winner == "Resistência":
-            messagebox.showinfo("Fim de Jogo", "A RESISTÊNCIA VENCEU!")
-        elif winner == "Espiões":
-            messagebox.showinfo("Fim de Jogo", "OS ESPIÕES VENCERAM!")
-        else:
-            messagebox.showinfo("Fim de Jogo", "EMPATE - Sem vencedor claro")
+        """
+        Exibe o diálogo final de fim de jogo com mais detalhes,
+        incluindo os resultados de todas as missões.
+        """
+        if self.local_player_id: # Garante que só clientes de jogador exibam
+            mission_results = self.game_state_data.get('mission_results', [])
+            resistance_wins = self.game_state_data.get('resistance_wins', 0)
+            spy_wins = self.game_state_data.get('spy_wins', 0)
+            
+            # Formata os resultados da missão para exibição
+            formatted_results = [("Sucesso" if r else "Falha") for r in mission_results]
+            
+            # Usar o novo diálogo GameOverDetailsDialog para mais controle
+            GameOverDetailsDialog(
+                self.root,
+                winner,
+                formatted_results,
+                resistance_wins,
+                spy_wins
+            )
+            # A mensagembox original pode ser removida se o GameOverDetailsDialog for suficiente
+            # messagebox.showinfo("Fim de Jogo", f"Fim de Jogo! Vencedor: {winner}")
+
 
     def update_timer(self, remaining_time: int):
         """Atualiza a label do temporizador na View principal."""

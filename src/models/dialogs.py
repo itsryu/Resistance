@@ -1,35 +1,50 @@
 import tkinter as tk
 from tkinter import messagebox, Toplevel, Label, Button
-from typing import List, Any, Callable, Optional
-from src.utils.settings import BG_DARK, BG_MEDIUM, TEXT_PRIMARY, TEXT_ACCENT, FONT_TITLE, FONT_DEFAULT, BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, GAME_TITLE, BORDER_RADIUS, BG_LIGHT, ERROR_COLOR
+from typing import List, Any, Callable, Optional, Dict
+from src.utils.settings import BG_DARK, BG_MEDIUM, TEXT_PRIMARY, TEXT_ACCENT, FONT_TITLE, FONT_DEFAULT, BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, GAME_TITLE, FONT_SUBTITLE, BG_LIGHT, ERROR_COLOR
+
 
 class CustomDialog(tk.Toplevel):
     """
     Classe base para diálogos personalizados, fornecendo estilos comuns
     e um mecanismo para capturar a resposta. Inclui um temporizador.
     """
-    def __init__(self, parent: tk.Tk, title: str, message: str, timeout: int = 0):
+    def __init__(self, parent: tk.Tk, title: str, message: str, timeout: int = 0, on_close_callback: Optional[Callable[[], None]] = None):
         super().__init__(parent)
         self.transient(parent)
-        self.grab_set()
+        self.grab_set() # Torna a janela modal
         self.title(f"{GAME_TITLE} - {title}")
         self.configure(bg=BG_DARK, padx=20, pady=20)
         self.resizable(False, False)
 
+        self.parent = parent
         self.result: Any = None
         self.timeout = timeout
         self._timer_id: Optional[str] = None # Para cancelar o after
+        self._callback_executed: bool = False # Flag para evitar múltiplas chamadas de callback
+        self._on_close_callback = on_close_callback # Callback opcional para ser chamado no fechamento
 
         Label(self, text=title, font=FONT_TITLE, fg=TEXT_ACCENT, bg=BG_DARK).pack(pady=10)
         Label(self, text=message, font=FONT_DEFAULT, fg=TEXT_PRIMARY, bg=BG_DARK).pack(pady=10)
 
-        # Adiciona a label do temporizador no diálogo
         self.timer_label = Label(self, text="", font=FONT_DEFAULT, fg=TEXT_ACCENT, bg=BG_DARK)
         self.timer_label.pack(pady=5)
 
-        self._start_timer() # Inicia o temporizador ao criar o diálogo
+        # Centraliza a janela após todos os widgets serem empacotados
+        self.update_idletasks()
+        parent_x = self.parent.winfo_x()
+        parent_y = self.parent.winfo_y()
+        parent_width = self.parent.winfo_width()
+        parent_height = self.parent.winfo_height()
 
-        # Garante que o diálogo é fechado e o timer cancelado
+        self_width = self.winfo_width()
+        self_height = self.winfo_height()
+
+        x = parent_x + (parent_width // 2) - (self_width // 2)
+        y = parent_y + (parent_height // 2) - (self_height // 2)
+        self.geometry(f"+{x}+{y}")
+
+        self._start_timer()
         self.protocol("WM_DELETE_WINDOW", self._on_close_dialog) 
 
     def _start_timer(self):
@@ -42,12 +57,12 @@ class CustomDialog(tk.Toplevel):
 
     def _timer_countdown(self, remaining_time: int):
         """Atualiza a contagem regressiva e agenda a próxima atualização."""
-        if remaining_time > 0 and self.winfo_exists(): # Garante que o widget ainda existe
+        if remaining_time > 0 and self.winfo_exists():
             self._update_timer_display(remaining_time)
             self._timer_id = self.after(1000, self._timer_countdown, remaining_time - 1)
-        elif self.winfo_exists(): # Tempo esgotado
+        elif self.winfo_exists() and not self._callback_executed: # Tempo esgotado
             self._update_timer_display(0)
-            self._on_timeout()
+            self._on_timeout() # Chama o handler de timeout da subclasse
 
     def _update_timer_display(self, remaining_time: int):
         """Atualiza o texto da label do temporizador."""
@@ -55,22 +70,43 @@ class CustomDialog(tk.Toplevel):
             self.timer_label.config(text=f"Tempo restante: {remaining_time}s")
         else:
             self.timer_label.config(text="Tempo esgotado!")
+            self.timer_label.config(fg=ERROR_COLOR) # Destaca a cor para erro
 
     def _on_timeout(self):
-        """Ação a ser executada quando o temporizador atinge zero."""
-        # Este método será sobrescrito pelas classes filhas TeamSelectionDialog e YesNoDialog
-        self._on_close_dialog()
+        """Ação a ser executada quando o temporizador atinge zero.
+        Deve ser sobrescrito por classes filhas.
+        """
+        if not self._callback_executed:
+            self._callback_executed = True
+            # Subclasses devem implementar a lógica específica aqui
+            # E chamar self._finish_dialog() para fechar.
+            self._finish_dialog()
 
-    def _on_close_dialog(self):
-        """Lida com o fechamento do diálogo, cancelando o timer."""
+
+    def _finish_dialog(self):
+        """Finaliza o diálogo de forma controlada, cancelando o timer e liberando o grab."""
         if self._timer_id:
             self.after_cancel(self._timer_id)
-        self.destroy()
+            self._timer_id = None # Limpa o ID para evitar cancelamentos repetidos
+        
+        if self.winfo_exists(): # Verifica se a janela ainda existe antes de destruir
+            self.destroy()
         self.grab_release()
 
-    def _on_confirm(self):
-        """Método de callback padrão para confirmação do diálogo."""
-        self._on_close_dialog() # Chamará _on_close_dialog para fechar e cancelar o timer
+        if self._on_close_callback and callable(self._on_close_callback):
+            self._on_close_callback()
+
+    def _on_close_dialog(self):
+        """Lida com o fechamento do diálogo via botão X ou protocolo de janela."""
+        if not self._callback_executed: # Se o callback ainda não foi executado (ex: por timeout)
+            self._callback_executed = True
+            # Subclasses devem chamar seu próprio callback com um valor padrão ou None
+            # antes de chamar _finish_dialog().
+            # Por padrão, se nada foi escolhido e o diálogo é fechado, o callback não é acionado
+            # Ou, se precisar de um feedback de fechamento, o callback pode receber None
+            self.callback(None) if hasattr(self, 'callback') and callable(self.callback) else None
+        
+        self._finish_dialog()
 
 
 class TeamSelectionDialog(CustomDialog):
@@ -78,14 +114,14 @@ class TeamSelectionDialog(CustomDialog):
     Diálogo para o líder selecionar os membros da missão, utilizando botões para seleção.
     """
     def __init__(self, parent: tk.Tk, leader_id: int, mission_size: int,
-                 available_players_ids: List[int], callback: Callable[[List[int]], None], timeout: int = 60):
-        # Passa o timeout para a classe base
+                 available_players_ids: List[int], callback: Callable[[Optional[List[int]]], None], timeout: int = 60):
         super().__init__(parent, f"Seleção de Equipe - Jogador {leader_id}",
-                         f"Jogador {leader_id}, clique nos jogadores para selecionar {mission_size} para a missão.", timeout)
+                         f"Jogador {leader_id}, clique nos jogadores para selecionar {mission_size} para a missão.",
+                         timeout)
         self.leader_id = leader_id
         self.mission_size = mission_size
         self.available_players_ids = available_players_ids
-        self.callback = callback
+        self.callback = callback # Callback que será chamado ao confirmar ou no timeout
         self.selected_team_ids: List[int] = []
         self.player_buttons: Dict[int, tk.Button] = {}
 
@@ -95,15 +131,12 @@ class TeamSelectionDialog(CustomDialog):
                                           font=FONT_DEFAULT, fg=TEXT_PRIMARY, bg=BG_DARK)
         self.selected_count_label.pack(pady=10)
 
-
         confirm_button = Button(self, text="Confirmar Equipe", font=FONT_DEFAULT,
                                 bg=BUTTON_BG, fg=BUTTON_FG, relief="flat", command=self._process_selection,
                                 activebackground=BUTTON_HOVER_BG, activeforeground=BUTTON_FG)
         confirm_button.pack(pady=10, ipadx=10, ipady=5)
         confirm_button.bind("<Enter>", self._on_enter_button)
         confirm_button.bind("<Leave>", self._on_leave_button)
-        # O protocolo WM_DELETE_WINDOW já é tratado na classe base (_on_close_dialog)
-
 
     def _create_player_selection_ui(self):
         """Cria os botões para cada jogador disponível."""
@@ -138,22 +171,26 @@ class TeamSelectionDialog(CustomDialog):
         self.selected_team_ids.sort()
         self.selected_count_label.config(text=self._get_selected_count_text())
 
-
     def _process_selection(self):
         """Processa a seleção do usuário e chama o callback."""
         if len(self.selected_team_ids) != self.mission_size:
             messagebox.showerror("Erro", f"Você deve escolher exatamente {self.mission_size} jogadores para a equipe.")
             return
-
-        self.callback(self.selected_team_ids)
-        self._on_close_dialog() # Usa o método da classe base para fechar e cancelar o timer
+        
+        if not self._callback_executed: # Garante que o callback não foi chamado por timeout ou fechamento
+            self._callback_executed = True
+            self.callback(self.selected_team_ids)
+            self._finish_dialog() # Usa o método da classe base para fechar e cancelar o timer
     
     # Sobrescreve _on_timeout para lidar com o que acontece quando o timer acaba
     def _on_timeout(self):
-        messagebox.showwarning("Tempo Esgotado", "Tempo para selecionar a equipe esgotado. A equipe não foi proposta.")
-        self.callback([]) # Envia uma equipe vazia para o controller
-        self._on_close_dialog()
+        if not self._callback_executed:
+            self._callback_executed = True
+            messagebox.showwarning("Tempo Esgotado", "Tempo para selecionar a equipe esgotado. Nenhuma equipe foi proposta.")
+            self.callback([]) # Envia uma equipe vazia para o controller (sinaliza proposta inválida ou timeout)
+            self._finish_dialog()
 
+    # Hover effects
     def _on_enter_button(self, event):
         event.widget['background'] = BUTTON_HOVER_BG
 
@@ -161,11 +198,11 @@ class TeamSelectionDialog(CustomDialog):
         event.widget['background'] = BUTTON_BG
 
     def _on_enter_player_button(self, event):
-        if event.widget['bg'] != TEXT_ACCENT:
+        if event.widget['bg'] != str(TEXT_ACCENT): # Compare com a string de cor
             event.widget['background'] = BG_LIGHT
 
     def _on_leave_player_button(self, event):
-        if event.widget['bg'] != TEXT_ACCENT:
+        if event.widget['bg'] != str(TEXT_ACCENT): # Compare com a string de cor
             event.widget['background'] = BG_MEDIUM
 
 
@@ -174,40 +211,120 @@ class YesNoDialog(CustomDialog):
     Diálogo genérico para perguntas de Sim/Não, usado para votos e sabotagens.
     """
     def __init__(self, parent: tk.Tk, player_id: int, question: str, callback: Callable[[bool], None], timeout: int = 30):
-        # Passa o timeout para a classe base
         super().__init__(parent, f"Ação do Jogador {player_id}", question, timeout)
         self.player_id = player_id
-        self.callback = callback
+        self.callback = callback # Callback que será chamado ao confirmar ou no timeout
 
         button_frame = tk.Frame(self, bg=BG_DARK)
         button_frame.pack(pady=10)
 
         yes_button = Button(button_frame, text="✅ SIM", font=FONT_DEFAULT,
                             bg="#28a745", fg="white", relief="flat",
-                            command=lambda: self._respond(True),
-                            activebackground="#218838", activeforeground="white")
+                            command=lambda: self._respond(True))
         yes_button.pack(side=tk.LEFT, padx=10, ipadx=10, ipady=5)
         yes_button.bind("<Enter>", lambda e: e.widget.config(bg="#218838"))
         yes_button.bind("<Leave>", lambda e: e.widget.config(bg="#28a745"))
 
         no_button = Button(button_frame, text="❌ NÃO", font=FONT_DEFAULT,
                            bg="#dc3545", fg="white", relief="flat",
-                           command=lambda: self._respond(False),
-                           activebackground="#c82333", activeforeground="white")
+                           command=lambda: self._respond(False))
         no_button.pack(side=tk.RIGHT, padx=10, ipadx=10, ipady=5)
         no_button.bind("<Enter>", lambda e: e.widget.config(bg="#c82333"))
         no_button.bind("<Leave>", lambda e: e.widget.config(bg="#dc3545"))
-        # O protocolo WM_DELETE_WINDOW já é tratado na classe base (_on_close_dialog)
-
 
     def _respond(self, choice: bool):
         """Registra a escolha e chama o callback."""
-        self.result = choice
-        self.callback(choice)
-        self._on_close_dialog() # Usa o método da classe base para fechar e cancelar o timer
+        if not self._callback_executed: # Garante que o callback não foi chamado por timeout ou fechamento
+            self._callback_executed = True
+            self.result = choice
+            self.callback(choice)
+            self._finish_dialog() # Usa o método da classe base para fechar e cancelar o timer
 
     # Sobrescreve _on_timeout para lidar com o que acontece quando o timer acaba
     def _on_timeout(self):
-        messagebox.showwarning("Tempo Esgotado", "Tempo para responder esgotado. Voto/Escolha padrão (NÃO) será usado.")
-        self.callback(False) # Envia False (NÃO) para o controller como resposta padrão
-        self._on_close_dialog()
+        if not self._callback_executed:
+            self._callback_executed = True
+            messagebox.showwarning("Tempo Esgotado", "Tempo para responder esgotado. Voto/Escolha padrão (NÃO) será usado.")
+            self.callback(False) # Envia False (NÃO) para o controller como resposta padrão
+            self._finish_dialog()
+
+
+# NOVAS CLASSES DE DIÁLOGO (Baseadas na estrutura CustomDialog)
+
+class MissionOutcomeDialog(CustomDialog):
+    def __init__(self, parent: tk.Tk, success: bool, sabotages_count: int):
+        title = "Missão Bem-Sucedida!" if success else "Missão Falhou!"
+        message = ("A Resistência obteve sucesso na missão!" 
+                   if success 
+                   else f"Os Espiões sabotaram a missão com {sabotages_count} falha(s)!")
+        
+        super().__init__(parent, title, message, timeout=5) # Diálogo informativo, pode ter um timeout curto
+
+        ok_button = Button(self, text="OK", font=FONT_DEFAULT,
+                           bg=BUTTON_BG, fg=BUTTON_FG, relief="flat", command=self._on_confirm_outcome)
+        ok_button.pack(pady=10)
+        ok_button.bind("<Enter>", lambda e: e.widget.config(bg=BUTTON_HOVER_BG))
+        ok_button.bind("<Leave>", lambda e: e.widget.config(bg=BUTTON_BG))
+
+        # Ajusta o timer_label para ocultar-se ou mudar a cor após o timeout
+        if not success:
+            self.timer_label.config(fg=ERROR_COLOR) # Destaca se a missão falhou
+
+    def _on_confirm_outcome(self):
+        """Callback para o botão OK do diálogo de resultado de missão."""
+        if not self._callback_executed: # Garante que o callback não foi chamado por timeout
+            self._callback_executed = True
+            self._finish_dialog()
+
+    def _on_timeout(self):
+        """Sobrescreve para fechar automaticamente após timeout."""
+        if not self._callback_executed:
+            self._callback_executed = True
+            self._finish_dialog() # Apenas fecha, sem callback externo para este diálogo
+
+
+class GameOverDetailsDialog(CustomDialog):
+    def __init__(self, parent: tk.Tk, winner: str, mission_results: List[str], resistance_wins: int, spy_wins: int):
+        # A mensagem inicial pode ser mais genérica, os detalhes vêm nos labels abaixo
+        super().__init__(parent, "Fim de Jogo", f"O vencedor é: {winner}!", timeout=0) # Sem timeout para o diálogo final
+
+        self.geometry("450x450") # Um pouco maior para exibir mais informações
+
+        winner_label = Label(self, text=f"Vencedor: {winner}", font=FONT_TITLE, fg=TEXT_ACCENT, bg=BG_DARK)
+        winner_label.pack(pady=(0, 15))
+
+        results_heading = Label(self, text="Resultados das Missões:", font=FONT_SUBTITLE, fg=TEXT_PRIMARY, bg=BG_DARK)
+        results_heading.pack(pady=(10, 5))
+
+        # Adiciona um frame para a lista de resultados com scrollbar, se necessário
+        results_frame = tk.Frame(self, bg=BG_LIGHT, bd=1, relief="solid")
+        results_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
+
+        results_text_widget = tk.Text(results_frame, font=FONT_DEFAULT, fg=TEXT_PRIMARY, bg=BG_LIGHT,
+                                       wrap=tk.WORD, height=len(mission_results) + 1, relief="flat", bd=0)
+        results_text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        results_text_widget.insert(tk.END, "\n".join([f"Missão {i+1}: {res}" for i, res in enumerate(mission_results)]))
+        results_text_widget.config(state=tk.DISABLED) # Torna o texto somente leitura
+
+        scrollbar = tk.Scrollbar(results_frame, command=results_text_widget.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        results_text_widget.config(yscrollcommand=scrollbar.set)
+
+        score_label = Label(self, text=f"Placar: Resistência {resistance_wins} x {spy_wins} Espiões", font=FONT_SUBTITLE, fg=TEXT_PRIMARY, bg=BG_DARK)
+        score_label.pack(pady=(15, 20))
+
+        ok_button = Button(self, text="OK", font=FONT_DEFAULT,
+                           bg=BUTTON_BG, fg=BUTTON_FG, relief="flat", command=self._on_confirm_game_over)
+        ok_button.pack(pady=10)
+        ok_button.bind("<Enter>", lambda e: e.widget.config(bg=BUTTON_HOVER_BG))
+        ok_button.bind("<Leave>", lambda e: e.widget.config(bg=BUTTON_BG))
+
+    def _on_confirm_game_over(self):
+        """Callback para o botão OK do diálogo de fim de jogo."""
+        if not self._callback_executed:
+            self._callback_executed = True
+            self._finish_dialog()
+
+    def _on_timeout(self):
+        """Diálogo de fim de jogo não deve ter timeout para fechamento automático."""
+        pass # Não faz nada no timeout, espera o usuário clicar OK
