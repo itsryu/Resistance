@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, Canvas, ttk
+from tkinter import Canvas, ttk
 from typing import List, Callable, Optional, Dict, Any
 from src.utils.settings import (
     BG_DARK, BG_MEDIUM, BG_LIGHT, TEXT_PRIMARY, TEXT_ACCENT, BORDER_COLOR,
@@ -185,7 +185,7 @@ class GameView:
 
         # Timer Label (Adicionado para exibir o tempo restante)
         self.timer_label = tk.Label(self.root, text="", font=FONT_SUBTITLE, fg=TEXT_ACCENT, bg=BG_DARK)
-        self.timer_label.place(relx=0.5, rely=0.03, anchor="n") # Posiciona no topo central
+        self.timer_label.place(relx=0.5, rely=0.03, anchor="n")
 
         self.update_view({})
         
@@ -196,10 +196,9 @@ class GameView:
         """
         Exibe um diálogo modal com o resultado da missão e o número de sabotagens.
         """
-        if self.local_player_id: # Garante que só clientes de jogador exibam
+        if self.local_player_id:
             title = "Missão Bem-Sucedida!" if success else "Missão Falhou!"
             message = "A Resistência obteve sucesso na missão!" if success else f"Os Espiões sabotaram a missão com {sabotages_count} falha(s)!"
-            # Poderíamos usar messagebox, mas um diálogo customizado é mais flexível
             MissionOutcomeDialog(self.root, title, message)
 
     def _on_action_button_click(self):
@@ -303,15 +302,13 @@ class GameView:
         Exibe o diálogo final de fim de jogo com mais detalhes,
         incluindo os resultados de todas as missões.
         """
-        if self.local_player_id: # Garante que só clientes de jogador exibam
+        if self.local_player_id:
             mission_results = self.game_state_data.get('mission_results', [])
             resistance_wins = self.game_state_data.get('resistance_wins', 0)
             spy_wins = self.game_state_data.get('spy_wins', 0)
-            
-            # Formata os resultados da missão para exibição
+        
             formatted_results = [("Sucesso" if r else "Falha") for r in mission_results]
             
-            # Usar o novo diálogo GameOverDetailsDialog para mais controle
             GameOverDetailsDialog(
                 self.root,
                 winner,
@@ -319,8 +316,6 @@ class GameView:
                 resistance_wins,
                 spy_wins
             )
-            # A mensagembox original pode ser removida se o GameOverDetailsDialog for suficiente
-            # messagebox.showinfo("Fim de Jogo", f"Fim de Jogo! Vencedor: {winner}")
 
 
     def update_timer(self, remaining_time: int):
@@ -328,4 +323,4 @@ class GameView:
         if remaining_time > 0:
             self.timer_label.config(text=f"Tempo: {remaining_time}s")
         else:
-            self.timer_label.config(text="") # Limpa o timer quando termina
+            self.timer_label.config(text="")

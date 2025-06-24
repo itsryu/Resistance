@@ -1,18 +1,13 @@
 import tkinter as tk
-from tkinter import ttk, Canvas, messagebox, simpledialog # Import simpledialog para input
+from tkinter import ttk, messagebox, simpledialog
 import sys
-import time
-import os # Importar para manipulação de caminhos de arquivo
+import os
 
-from src.views.view import GameView
-from src.models.model import GameModel
 from src.controllers.controller import GameController
-from src.utils.network import GameServer, GameClient
 from src.utils.settings import (
     GAME_TITLE, FONT_TITLE, FONT_SUBTITLE, FONT_DEFAULT, FONT_HEADING,
     BG_DARK, BG_MEDIUM, BG_MENU, TEXT_ACCENT, TEXT_PRIMARY,
-    BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, NUM_PLAYERS, NUM_SPIES,
-    BORDER_COLOR, SERVER_HOST, SERVER_PORT
+    BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, BORDER_COLOR
 )
 from typing import Optional
 
@@ -35,7 +30,7 @@ class MainApplication(tk.Tk):
         self._current_frame: Optional[tk.Frame] = None
         self._loading_screen: Optional[tk.Toplevel] = None
         self.sound_enabled = tk.BooleanVar(value=True)
-        self.how_to_play_text_content: str = self._load_how_to_play_text() # O texto é carregado por este método
+        self.how_to_play_text_content: str = self._load_how_to_play_text()
 
         self._configure_ttk_style()
         self._show_main_menu()
@@ -44,7 +39,7 @@ class MainApplication(tk.Tk):
 
     def _load_how_to_play_text(self) -> str:
         """Carrega o texto de como jogar de um arquivo .txt."""
-        script_dir = os.path.dirname(__file__) # Pega o diretório do script atual
+        script_dir = os.path.dirname(__file__)
         file_path = os.path.join(script_dir, 'how_to_play.txt')
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
