@@ -1,43 +1,57 @@
-# --- resistance_game/game_constants.py ---
-# Define constantes e configurações globais do jogo.
-
 import tkinter as tk
 from typing import List, Dict, Any, Callable, Optional, Tuple
+from enum import Enum
 
 # Constantes de Estilo para a GUI
-BG_DARK = "#1a1a1a"
-BG_MEDIUM = "#0d0d0d"
-TEXT_PRIMARY = "#00ff99"
-TEXT_ACCENT = "#00bfff"
-BUTTON_BG = "#00bfff"
-BUTTON_FG = "white"
-ERROR_COLOR = "#ff4444"
-FONT_TITLE = ("Helvetica", 24, "bold")
-FONT_DEFAULT = ("Helvetica", 12)
-FONT_LOG = ("Courier", 10)
-BORDER_RADIUS = 10 # Para simular cantos arredondados em Tkinter, precisaria de Canvas ou ttk.Style
+BG_DARK = "#1a1a1a"          # Fundo principal escuro
+BG_MEDIUM = "#2a2a2a"         # Elementos de fundo secundários
+BG_LIGHT = "#3a3a3a"          # Para detalhes mais claros
+BG_MENU = "#0d0d0d"           # Fundo específico para menus, ainda mais escuro
+
+TEXT_PRIMARY = "#00ff99"      # Verde neon para texto principal
+TEXT_ACCENT = "#00bfff"       # Azul ciano para destaques e títulos
+BUTTON_BG = "#00bfff"         # Cor de fundo dos botões
+BUTTON_FG = "white"           # Cor do texto dos botões
+BUTTON_HOVER_BG = "#0099cc"   # Cor do botão ao passar o mouse
+ERROR_COLOR = "#ff4444"       # Vermelho para mensagens de erro
+BORDER_COLOR = "#00ff99"      # Cor da borda para elementos importantes
+
+FONT_FAMILY = "Consolas" # Fonte mais moderna e limpa
+
+FONT_TITLE = (FONT_FAMILY, 30, "bold")      # Títulos maiores
+FONT_SUBTITLE = (FONT_FAMILY, 18, "bold")   # Subtítulos
+FONT_HEADING = (FONT_FAMILY, 14, "bold")    # Títulos de seção
+FONT_DEFAULT = (FONT_FAMILY, 12)            # Texto geral
+FONT_LOG = ("Courier New", 10)              # Fonte monoespaçada para logs
+
+BORDER_RADIUS = 5 # Simulado com `relief` e `bd` para um visual mais suave
 
 # Configurações do Jogo
+GAME_TITLE = "The Resistance"
 NUM_PLAYERS = 5
 NUM_SPIES = 2
 MISSION_SIZES = [2, 3, 2, 3, 3] # Tamanhos das missões para 5 jogadores
 
 # Configurações de Rede
-SERVER_HOST = '127.0.0.1' # Endereço IP do servidor. Use '0.0.0.0' para aceitar de qualquer IP na rede local.
-SERVER_PORT = 12345       # Porta do servidor
-BUFFER_SIZE = 4096        # Tamanho do buffer para mensagens de rede
+SERVER_HOST = '127.0.0.1'
+SERVER_PORT = 12345
+BUFFER_SIZE = 4096
 
-# Tipos de Mensagem do Protocolo (mantidos)
-MSG_TYPE_CONNECT_ACK = "CONNECT_ACK"
-MSG_TYPE_GAME_STATE_UPDATE = "GAME_STATE_UPDATE"
-MSG_TYPE_START_GAME = "START_GAME"
-MSG_TYPE_PLAYER_ROLE = "PLAYER_ROLE" # Usado para enviar o papel específico a um cliente
-MSG_TYPE_REQUEST_TEAM_SELECTION = "REQUEST_TEAM_SELECTION"
-MSG_TYPE_TEAM_PROPOSED = "TEAM_PROPOSED" # Cliente -> Servidor
-MSG_TYPE_REQUEST_VOTE = "REQUEST_VOTE"
-MSG_TYPE_VOTE_CAST = "VOTE_CAST"     # Cliente -> Servidor
-MSG_TYPE_REQUEST_SABOTAGE = "REQUEST_SABOTAGE"
-MSG_TYPE_SABOTAGE_CHOICE = "SABOTAGE_CHOICE" # Cliente -> Servidor
-MSG_TYPE_MISSION_OUTCOME = "MISSION_OUTCOME" # Servidor -> Cliente (para log ou eventos específicos)
-MSG_TYPE_GAME_OVER = "GAME_OVER"
-MSG_TYPE_LOG_MESSAGE = "LOG_MESSAGE" # Servidor -> Cliente (para mensagens gerais no log)
+# Caminho do arquivo de salvamento do estado do jogo (apenas para o servidor)
+SAVE_FILE_PATH = "game_state.json"
+
+# Tipos de Mensagem do Protocolo como Enum
+class MessageType(Enum):
+    CONNECT_ACK = "CONNECT_ACK"
+    GAME_STATE_UPDATE = "GAME_STATE_UPDATE"
+    START_GAME = "START_GAME"
+    PLAYER_ROLE = "PLAYER_ROLE"
+    REQUEST_TEAM_SELECTION = "REQUEST_TEAM_SELECTION"
+    TEAM_PROPOSED = "TEAM_PROPOSED"
+    REQUEST_VOTE = "REQUEST_VOTE"
+    VOTE_CAST = "VOTE_CAST"
+    REQUEST_SABOTAGE = "REQUEST_SABOTAGE"
+    SABOTAGE_CHOICE = "SABOTAGE_CHOOGE"
+    MISSION_OUTCOME = "MISSION_OUTCOME"
+    GAME_OVER = "GAME_OVER"
+    LOG_MESSAGE = "LOG_MESSAGE"
