@@ -45,7 +45,7 @@ class GameController:
 
         self.players: List[Player] = []
         self.connected_player_ids: List[int] = []
-        self.local_player_id: Optional[int] = None
+        self.local_player_id: Optional[int] = None # Definido como None por padrão
         self.local_player_role: Optional[str] = None
 
         self._game_logic_thread: Optional[threading.Thread] = None 
@@ -87,7 +87,7 @@ class GameController:
 
             self.model.set_state_changed_callback(self._on_model_state_changed) 
             
-            self.local_player_id = 1 
+            # REMOVIDO: self.local_player_id = 1 (O servidor não é mais um jogador ativo)
 
             # O servidor sempre ouve em '0.0.0.0' para aceitar conexões de qualquer IP local
             self.server = GameServer('0.0.0.0', SERVER_PORT, self._on_client_connected)
@@ -100,6 +100,7 @@ class GameController:
                 self._game_logic_thread = threading.Thread(target=self._run_game_logic_server, daemon=True)
                 self._game_logic_thread.start()
             else:
+                # Agora o servidor aguarda NUM_PLAYERS (5) clientes para iniciar o jogo
                 self.view.action_button.config(text="Aguardando Jogadores...", command=self.request_start_game, state=tk.DISABLED)
                 self.view.write_to_log(f"Aguardando {NUM_PLAYERS} jogadores se conectarem...")
             
@@ -228,9 +229,11 @@ class GameController:
             game_state = message.state
             if game_state:
                 self.view.update_view(game_state)
+                # A UI do cliente agora mostra o role e ID recebido do servidor,
+                # garantindo que ela saiba quem é o jogador local
                 if self.local_player_id and 'players_roles' in game_state:
                     role = game_state['players_roles'].get(str(self.local_player_id)) 
-                    if role and self.local_player_role is None:
+                    if role: # Garante que o role seja atualizado mesmo após o início do jogo
                         self.local_player_role = role
                         self.view.set_local_player_info(self.local_player_id, self.local_player_role)
             else:
@@ -272,8 +275,10 @@ class GameController:
     def _handle_start_game_request(self, message: NetworkMessage):
         """Handler para solicitação de início de jogo (apenas servidor)."""
         if self.is_server and self.model and self.server and isinstance(message, StartGameMessage):
+            # A condição agora verifica se há NUM_PLAYERS clientes conectados,
+            # já que o servidor não é mais um jogador.
             if not self.model.game_started or self.model.is_game_over():
-                if len(self.connected_player_ids) < NUM_PLAYERS:
+                if len(self.connected_player_ids) < NUM_PLAYERS: # NUM_PLAYERS agora refere-se apenas a clientes
                     self.view.write_to_log(f"Número insuficiente de jogadores ({len(self.connected_player_ids)}/{NUM_PLAYERS}) para iniciar o jogo.")
                     self.server.send_to_all_clients(LogMessage(text=f"O servidor precisa de mais {NUM_PLAYERS - len(self.connected_player_ids)} jogadores para iniciar."
                     ))
@@ -300,19 +305,12 @@ class GameController:
                        not all(1 <= p_id <= self.model.num_players for p_id in team_ids) or \
                        len(set(team_ids)) != len(team_ids):
                         self.server.send_to_client(leader_id, LogMessage(text="Seleção de equipe inválida. Por favor, tente novamente."))
-                        if leader_id == self.local_player_id:
-                             self.root.after(100, lambda: self.view.show_team_selection_dialog(
-                                leader_id=leader_id,
-                                mission_size=self.model.get_current_mission_size(),
-                                available_players_ids=list(range(1, self.model.num_players + 1)),
-                                callback=self._on_team_selected_server_local_callback
-                            ))
-                        else:
-                            self.server.send_to_client(leader_id, RequestTeamSelectionMessage(
-                                leader_id=leader_id,
-                                mission_size=self.model.get_current_mission_size(),
-                                available_players_ids=list(range(1, self.model.num_players + 1))
-                            ))
+                        # O servidor não é um jogador, então sempre envia a requisição de volta ao cliente.
+                        self.server.send_to_client(leader_id, RequestTeamSelectionMessage(
+                            leader_id=leader_id,
+                            mission_size=self.model.get_current_mission_size(),
+                            available_players_ids=list(range(1, self.model.num_players + 1))
+                        ))
                         return 
 
                     self.model.set_proposed_team(team_ids)
@@ -382,6 +380,7 @@ class GameController:
             with self._current_phase_lock:
                 if not self.model.game_started:
                     self.model.reset_game()
+                    # O modelo agora atribui roles para NUM_PLAYERS clientes
                     roles = self.model.assign_roles()
                     self.players = [Player(i, roles[i]) for i in range(1, self.model.num_players + 1)]
                     self.view.write_to_log("Jogo iniciado! Papéis atribuídos.")
@@ -401,13 +400,13 @@ class GameController:
                 try:
                     team_ids = self.team_selection_response_queue.get(timeout=60)
                 except queue.Empty:
-                    self.view.write_to_log("Tempo esgotado: Nenhuma equipe proposta pelo líder. Avançando líder.")
+                    self.view.write_to_log("Tempo esgotado: Nenhuma equipe proposta pelo líder. Advancing leader.")
                     with self._current_phase_lock:
                         self.model.advance_leader()
                     continue
 
                 if not team_ids:
-                    self.view.write_to_log("Equipe selecionada inválida ou vazia. Avançando líder.")
+                    self.view.write_to_log("Equipe selecionada inválida ou vazia. Advancing leader.")
                     with self._current_phase_lock:
                         self.model.advance_leader()
                     continue
@@ -419,12 +418,14 @@ class GameController:
                 
                 for player_to_vote_obj in self.players:
                     player_id = player_to_vote_obj.player_id
-                    self.vote_response_queues[player_id] = self.vote_response_queues[player_id]
+                    # Garante que a fila do jogador existe e está pronta para receber o voto
+                    self.vote_response_queues[player_id] = self.vote_response_queues[player_id] 
 
                     self.root.after(100, lambda p=player_id: self._request_next_vote_server(p, team_ids))
                     try:
                         vote_choice = self.vote_response_queues[player_id].get(timeout=30)
                         self.view.write_to_log(f"Voto recebido do Jogador {player_id}: {vote_choice}")
+                        # model.record_vote é chamado por _handle_vote_cast ou _on_vote_cast_server_local_callback
                     except queue.Empty:
                         self.view.write_to_log(f"Tempo esgotado: Jogador {player_id} não votou. Assumindo NÃO.")
                         with self._current_phase_lock:
@@ -443,12 +444,14 @@ class GameController:
                     for player_on_mission_id in team_ids:
                         player_obj_on_mission = next((p for p in self.players if p.player_id == player_on_mission_id), None)
                         if player_obj_on_mission and player_obj_on_mission.is_spy:
-                            self.sabotage_response_queues[player_obj_on_mission.player_id] = self.sabotage_response_queues[player_obj_on_mission.player_id]
+                            # Garante que a fila do espião existe e está pronta para receber a escolha de sabotagem
+                            self.sabotage_response_queues[player_obj_on_mission.player_id] = self.sabotage_response_queues[player_obj_on_mission.player_id] 
 
                             self.root.after(100, lambda p=player_obj_on_mission.player_id: self._request_next_sabotage_server(p, True))
                             try:
                                 sabotage_choice = self.sabotage_response_queues[player_obj_on_mission.player_id].get(timeout=30)
                                 self.view.write_to_log(f"Escolha de sabotagem recebida do Jogador {player_obj_on_mission.player_id}: {sabotage_choice}.")
+                                # model.record_sabotage é chamado por _handle_sabotage_choice ou _on_sabotage_choice_server_local_callback
                             except queue.Empty:
                                 self.view.write_to_log(f"Tempo esgotado: Espião Jogador {player_obj_on_mission.player_id} não escolheu sabotar. Assumindo NÃO.")
                                 with self._current_phase_lock:
@@ -490,7 +493,10 @@ class GameController:
         mission_size = self.model.get_current_mission_size() 
         available_ids = list(range(1, self.model.num_players + 1)) 
 
-        if leader_id == self.local_player_id:
+        # O servidor NÃO é um jogador, então ele NUNCA será o local_player_id para ações de jogo.
+        # Portanto, este bloco de código só se aplicaria se local_player_id fosse definido (o que não será).
+        # A requisição para seleção de equipe SEMPRE será enviada a um cliente.
+        if leader_id == self.local_player_id: # Esta condição agora sempre será Falsa para o servidor
             self.view.write_to_log(f"Servidor (atuando como Jogador {leader_id}): Solicitando sua seleção de equipe localmente.")
             self.root.after(0, lambda: self.view.show_team_selection_dialog(
                 leader_id=leader_id,
@@ -498,7 +504,7 @@ class GameController:
                 available_players_ids=available_ids,
                 callback=self._on_team_selected_server_local_callback
             ))
-        else:
+        else: # Envia requisição para um cliente remoto
             self.server.send_to_client(leader_id, RequestTeamSelectionMessage(
                 leader_id=leader_id,
                 mission_size=mission_size,
@@ -533,14 +539,15 @@ class GameController:
         """Solicita o voto de um jogador específico."""
         if self.model is None or self.server is None: return 
         
-        if player_id_to_vote == self.local_player_id:
+        # O servidor NÃO é um jogador, então ele NUNCA será o local_player_id para ações de jogo.
+        if player_id_to_vote == self.local_player_id: # Esta condição agora sempre será Falsa para o servidor
             self.view.write_to_log(f"Servidor (atuando como Jogador {player_id_to_vote}): Solicitando seu voto localmente.")
             self.root.after(0, lambda: self.view.show_vote_dialog(
                 player_id=player_id_to_vote,
                 team=team_ids,
                 callback=self._on_vote_cast_server_local_callback
             ))
-        else:
+        else: # Envia requisição para um cliente remoto
             self.server.send_to_client(player_id_to_vote, RequestVoteMessage(
                 player_id=player_id_to_vote,
                 team=team_ids
@@ -550,7 +557,8 @@ class GameController:
         """Solicita a escolha de sabotagem de um membro da equipe específico."""
         if self.model is None or self.server is None: return 
 
-        if player_id_on_mission == self.local_player_id:
+        # O servidor NÃO é um jogador, então ele NUNCA será o local_player_id para ações de jogo.
+        if player_id_on_mission == self.local_player_id: # Esta condição agora sempre será Falsa para o servidor
             if is_spy:
                 self.view.write_to_log(f"Servidor (atuando como Jogador {player_id_on_mission}): Solicitando sua escolha de sabotagem localmente.")
                 self.root.after(0, lambda: self.view.show_sabotage_dialog(
@@ -561,7 +569,7 @@ class GameController:
                 self.view.write_to_log(f"Servidor (atuando como Jogador {player_id_on_mission}, Resistência): Não pode sabotar. Escolha local é Falso.")
                 if player_id_on_mission in self.sabotage_response_queues:
                     self.sabotage_response_queues[player_id_on_mission].put(False)
-        else:
+        else: # Envia requisição para um cliente remoto
             if is_spy:
                 self.server.send_to_client(player_id_on_mission, RequestSabotageMessage(
                     player_id=player_id_on_mission
@@ -583,6 +591,7 @@ class GameController:
         self._on_model_state_changed()
 
     # --- Callbacks para ações locais do servidor (quando o servidor é o jogador) ---
+    # Esses callbacks não serão mais ativados já que o servidor não é um jogador.
     def _on_team_selected_server_local_callback(self, team_ids: List[int]):
         """Callback acionado quando o líder (servidor local) seleciona um time."""
         self.team_selection_response_queue.put(team_ids)
@@ -621,7 +630,7 @@ class GameController:
             )
         else:
             if not self.is_server and isinstance(message, RequestTeamSelectionMessage):
-                self.view.write_to_log(f"O líder atual é o Jogador {message.leader_id}. Aguardando seleção da equipe...")
+                self.view.write_to_log(f"O líder actual é o Jogador {message.leader_id}. Aguardando seleção da equipe...")
 
 
     def _on_team_selected_client_callback(self, team_ids: List[int]):

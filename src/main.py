@@ -15,9 +15,7 @@ from src.utils.settings import (
     BORDER_COLOR, SERVER_HOST, SERVER_PORT
 )
 from typing import Optional
-# REMOVIDO: from src.how_to_play_text import how_to_play_text
 
-# Tentar importar winsound para feedback sonoro no Windows
 try:
     import winsound
     _WINSOUND_AVAILABLE = True
