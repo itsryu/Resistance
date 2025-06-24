@@ -1,18 +1,20 @@
 import tkinter as tk
-from tkinter import ttk, Canvas, messagebox # Adicionado messagebox aqui
 import sys
 import time # Para simular atrasos para animações
+import os # Importar para manipulação de caminhos de arquivo
 
 from src.views.view import GameView
 from src.models.model import GameModel
 from src.controllers.controller import GameController
 from src.utils.network import GameServer, GameClient
+from tkinter import ttk, Canvas, messagebox
 from src.utils.settings import (
     GAME_TITLE, FONT_TITLE, FONT_SUBTITLE, FONT_DEFAULT, FONT_HEADING,
     BG_DARK, BG_MEDIUM, BG_MENU, TEXT_ACCENT, TEXT_PRIMARY,
     BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, NUM_PLAYERS, NUM_SPIES,
     BORDER_COLOR
 )
+from typing import Optional
 
 # Tentar importar winsound para feedback sonoro no Windows
 try:
@@ -35,11 +37,24 @@ class MainApplication(tk.Tk):
         self._current_frame: Optional[tk.Frame] = None # Frame que contém o conteúdo atual
         self._loading_screen: Optional[tk.Toplevel] = None
         self.sound_enabled = tk.BooleanVar(value=True) # Variável para controlar o som
+        self.how_to_play_text_content: str = self._load_how_to_play_text() # Carrega o texto
 
         self._configure_ttk_style()
         self._show_main_menu()
         
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    def _load_how_to_play_text(self) -> str:
+        """Carrega o texto de como jogar de um arquivo .txt."""
+        script_dir = os.path.dirname(__file__)
+        file_path = os.path.join(script_dir, 'how_to_play.txt')
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            return "Erro: Arquivo 'how_to_play.txt' não encontrado."
+        except Exception as e:
+            return f"Erro ao carregar o texto de como jogar: {e}"
 
     def _configure_ttk_style(self):
         """Configura o estilo para os widgets ttk."""
@@ -169,36 +184,9 @@ class MainApplication(tk.Tk):
 
         ttk.Label(self._current_frame, text="Como Jogar: The Resistance", style='Title.TLabel').grid(row=0, column=0, pady=(0, 20), sticky="n")
 
-        how_to_play_text = """
-The Resistance é um jogo de dedução social e blefe, jogado por 5 a 10 pessoas. Dividido em dois grupos, a Resistência (maioria) e os Espiões (minoria), o jogo exige que a Resistência complete uma série de missões bem-sucedidas para vencer, enquanto os Espiões tentam sabotá-las para alcançar a vitória.
-
-Papéis:
-- RESISTÊNCIA: Trabalhadores leais que tentam completar missões. Eles sempre devem votar SUCESSO.
-- ESPIÕES: Infiltrados que tentam sabotar missões. Eles podem votar SUCESSO ou FALHA (sabotagem).
-
-Fases do Jogo:
-1.  Início da Rodada e Líder: Um jogador é designado como o Líder da rodada. O Líder propõe uma equipe para a missão atual, selecionando um número específico de jogadores.
-2.  Votação de Aprovação da Equipe: Todos os jogadores votam (sim ou não) para aprovar a equipe proposta.
-    -   Se a maioria votar SIM: A equipe é aprovada e a missão prossegue.
-    -   Se a maioria votar NÃO: A equipe é rejeitada. O Líder passa para o próximo jogador, e um novo processo de proposta de equipe começa. Se 5 equipes consecutivas forem rejeitadas, os Espiões vencem a partida.
-3.  Execução da Missão (Voto Secreto): Os jogadores da equipe aprovada votam secretamente SUCESSO ou FALHA.
-    -   Membros da Resistência devem votar SUCESSO.
-    -   Espiões podem votar SUCESSO (para se disfarçar) ou FALHA (para sabotar a missão).
-    -   Se houver **nenhum voto de FALHA** (ou apenas um em missões que permitem uma falha), a missão é um SUCESSO.
-    -   Se houver **um ou mais votos de FALHA** (ou o número exigido para missões específicas), a missão é uma FALHA.
-
-Condições de Vitória:
--   RESISTÊNCIA VENCE: Se 3 missões forem bem-sucedidas.
--   ESPIÕES VENCEM: Se 3 missões falharem OU se 5 propostas de equipe consecutivas forem rejeitadas.
-
-Objetivo Final:
--   Resistência: Completar 3 missões.
--   Espiões: Causar 3 falhas em missões.
-        """
-        # Criando um Text widget para exibir o texto formatado com rolagem
         how_to_play_text_widget = tk.Text(self._current_frame, wrap=tk.WORD, bg=BG_MENU, fg=TEXT_PRIMARY,
                                          font=FONT_DEFAULT, relief="flat", padx=20, pady=20)
-        how_to_play_text_widget.insert(tk.END, how_to_play_text)
+        how_to_play_text_widget.insert(tk.END, self.how_to_play_text_content) # Usa o conteúdo carregado
         how_to_play_text_widget.config(state=tk.DISABLED) # Torna o texto somente leitura
         how_to_play_text_widget.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
 

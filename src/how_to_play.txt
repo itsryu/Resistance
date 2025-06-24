@@ -1,0 +1,16 @@
+The Resistance é um jogo de dedução social e blefe para 5 jogadores. Resistência (maioria) completa missões; Espiões (minoria) sabotam.
+
+Papéis:
+- Resistência: Trabalhadores leais; votam SUCESSO.
+- Espiões: Infiltrados; podem votar SUCESSO ou FALHA.
+
+Fases:
+1.  Líder propõe equipe.
+2.  Votação: Maioria aprova ou rejeita equipe.
+3.  Membros da equipe votam SUCESSO ou FALHA.
+    -   Resistência: Sempre SUCESSO.
+    -   Espiões: SUCESSO ou FALHA.
+
+Vitória:
+-   Resistência: 3 missões bem-sucedidas.
+-   Espiões: 3 missões falham OU 5 propostas rejeitadas.
