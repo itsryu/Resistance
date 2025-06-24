@@ -272,8 +272,6 @@ class GameView:
             self.action_button.config(state=tk.DISABLED, text="Aguardando Outros Jogadores...")
 
 
-    # --- Métodos que interagem com o Controller para obter input do usuário ---
-
     def show_team_selection_dialog(self, leader_id: int, mission_size: int,
                                    available_players_ids: List[int], callback: Callable[[List[int]], None], timeout: int = 60):
         """Exibe o diálogo de seleção de time e espera pelo input do líder local."""
