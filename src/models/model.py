@@ -2,11 +2,6 @@ import random
 from typing import List, Dict, Any, Callable, Optional
 
 class GameModel:
-    """
-    O Modelo do jogo "A Resistência". Gerencia o estado do jogo e as regras de negócio.
-    É completamente independente da interface do usuário (View) e do controlador (Controller).
-    Em um jogo LAN, este Model reside **apenas no servidor**.
-    """
     def __init__(self, num_players: int, num_spies: int, mission_sizes: List[int]):
         self.num_players: int = num_players
         self.num_spies: int = num_spies
@@ -130,7 +125,7 @@ class GameModel:
             'current_round': self.current_round,
             'mission_sizes': self.mission_sizes,
             'successful_missions': self.successful_missions,
-            'failed_failures': self.failed_missions, # Consistente com a View
+            'failed_failures': self.failed_missions,
             'current_leader_id': self.current_leader_id,
             'mission_results': self.mission_results,
             'is_game_over': self.is_game_over(),

@@ -2,11 +2,10 @@ import tkinter as tk
 from typing import List, Dict, Any, Callable, Optional, Tuple
 from enum import Enum
 
-# Constantes de Estilo para a GUI
-BG_DARK = "#1a1a1a"          # Fundo principal escuro
-BG_MEDIUM = "#2a2a2a"         # Elementos de fundo secundários
+BG_DARK = "#1a1a1a"          # Fundo principal
+BG_MEDIUM = "#2a2a2a"         # Fundo secundários
 BG_LIGHT = "#3a3a3a"          # Para detalhes mais claros
-BG_MENU = "#0d0d0d"           # Fundo específico para menus, ainda mais escuro
+BG_MENU = "#0d0d0d"           # Fundo para menus, ainda mais escuro
 
 TEXT_PRIMARY = "#00ff99"      # Verde neon para texto principal
 TEXT_ACCENT = "#00bfff"       # Azul ciano para destaques e títulos
@@ -16,9 +15,9 @@ BUTTON_HOVER_BG = "#0099cc"   # Cor do botão ao passar o mouse
 ERROR_COLOR = "#ff4444"       # Vermelho para mensagens de erro
 BORDER_COLOR = "#00ff99"      # Cor da borda para elementos importantes
 
-FONT_FAMILY = "Consolas" # Fonte mais moderna e limpa
+FONT_FAMILY = "Consolas"
 
-FONT_TITLE = (FONT_FAMILY, 30, "bold")      # Títulos maiores
+FONT_TITLE = (FONT_FAMILY, 30, "bold")      # Títulos
 FONT_SUBTITLE = (FONT_FAMILY, 18, "bold")   # Subtítulos
 FONT_HEADING = (FONT_FAMILY, 14, "bold")    # Títulos de seção
 FONT_DEFAULT = (FONT_FAMILY, 12)            # Texto geral

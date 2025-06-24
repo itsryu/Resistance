@@ -7,10 +7,6 @@ from src.utils.settings import BUFFER_SIZE
 from src.models.messages import ConnectAckMessage, NetworkMessage, create_message_from_dict
 
 class Network:
-    """
-    Classe base para funcionalidades de rede, fornecendo métodos comuns
-    para enviar e receber dados.
-    """
     def __init__(self):
         self._socket: Optional[socket.socket] = None
         self._is_running: bool = False
@@ -18,7 +14,6 @@ class Network:
         self.message_queue: queue.Queue[NetworkMessage] = queue.Queue()
 
     def _send_message(self, conn: socket.socket, message: NetworkMessage):
-        """Envia uma mensagem JSON através do socket."""
         try:
             message_str = json.dumps(message.to_dict())
             conn.sendall(message_str.encode('utf-8') + b'\n')
@@ -27,7 +22,6 @@ class Network:
             self._is_running = False
 
     def _receive_messages(self, conn: socket.socket, client_address: Optional[Tuple[str, int]] = None):
-        """Thread que recebe mensagens continuamente e as coloca na fila."""
         buffer = b''
         while self._is_running:
             try:
@@ -58,7 +52,6 @@ class Network:
         print(f"Thread de recebimento para {client_address or 'socket'} encerrada.")
 
     def stop(self):
-        """Para a operação de rede e fecha o socket."""
         self._is_running = False
         if self._socket:
             try:
@@ -70,9 +63,6 @@ class Network:
             self._receive_thread.join(timeout=1)
 
 class GameServer(Network):
-    """
-    O servidor do jogo. Aceita conexões de clientes e gerencia a comunicação.
-    """
     def __init__(self, host: str, port: int, client_connected_callback: Callable[[int], None]):
         super().__init__()
         self._host: str = host
@@ -83,7 +73,6 @@ class GameServer(Network):
         self._lock = threading.Lock()
 
     def start(self):
-        """Inicia o servidor e começa a escutar por conexões."""
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(0.5)
         try:
@@ -97,7 +86,6 @@ class GameServer(Network):
             self._is_running = False
 
     def _accept_connections(self):
-        """Loop que aceita novas conexões de clientes."""
         while self._is_running:
             try:
                 conn, addr = self._socket.accept() # type: ignore
@@ -124,7 +112,6 @@ class GameServer(Network):
         print("Thread de aceitação de conexões encerrada.")
 
     def send_to_all_clients(self, message: NetworkMessage):
-        """Envia uma mensagem para todos os clientes conectados."""
         disconnected_clients = []
         with self._lock:
             for player_id, conn in list(self.clients.items()):
@@ -137,7 +124,6 @@ class GameServer(Network):
                 self.remove_client(player_id)
 
     def send_to_client(self, player_id: int, message: NetworkMessage):
-        """Envia uma mensagem para um cliente específico."""
         with self._lock:
             conn = self.clients.get(player_id)
             if conn:
@@ -150,7 +136,6 @@ class GameServer(Network):
                 print(f"Cliente {player_id} não encontrado ou já desconectado.")
 
     def remove_client(self, player_id: int):
-        """Remove um cliente desconectado da lista."""
         with self._lock:
             if player_id in self.clients:
                 conn = self.clients.pop(player_id)
@@ -162,12 +147,10 @@ class GameServer(Network):
                 print(f"Cliente {player_id} removido.")
 
     def get_connected_player_ids(self) -> List[int]:
-        """Retorna os IDs dos jogadores atualmente conectados."""
         with self._lock:
             return list(self.clients.keys())
 
     def stop(self):
-        """Para o servidor, fechando todas as conexões de clientes."""
         super().stop()
         with self._lock:
             for player_id in list(self.clients.keys()):
@@ -176,9 +159,6 @@ class GameServer(Network):
         print("Servidor parado.")
 
 class GameClient(Network):
-    """
-    O cliente do jogo. Conecta-se ao servidor e gerencia a comunicação.
-    """
     def __init__(self, host: str, port: int):
         super().__init__()
         self._host: str = host
@@ -186,7 +166,6 @@ class GameClient(Network):
         self.player_id: Optional[int] = None
 
     def connect(self) -> bool:
-        """Tenta conectar ao servidor."""
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self._socket.connect((self._host, self._port))
@@ -200,7 +179,6 @@ class GameClient(Network):
             return False
 
     def send_message(self, message: NetworkMessage):
-        """Envia uma mensagem para o servidor."""
         if self._socket and self._is_running:
             self._send_message(self._socket, message)
         else:
