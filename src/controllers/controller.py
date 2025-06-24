@@ -57,7 +57,7 @@ class GameController:
         self._game_logic_thread: Optional[threading.Thread] = None 
         self._current_phase_lock = threading.Lock()
 
-        self.team_selection_response_queue: queue.Queue[List[int] | InvalidTeamProposedSignal] = queue.Queue() # Aceita o sinal
+        self.team_selection_response_queue: queue.Queue[List[int] | InvalidTeamProposedSignal] = queue.Queue()
         self.vote_response_queues: Dict[int, queue.Queue[bool]] = defaultdict(queue.Queue)
         self.sabotage_response_queues: Dict[int, queue.Queue[bool]] = defaultdict(queue.Queue)
 
@@ -268,8 +268,7 @@ class GameController:
             self.view.write_to_log("Servidor: Iniciando processo de início/reinício do jogo...")
             start_msg = StartGameMessage()
             self.server.send_to_all_clients(start_msg)
-            # Processa a mensagem localmente para o servidor iniciar a lógica do jogo
-            self._dispatch_message(start_msg)
+            self._dispatch_message(start_msg) # Processa localmente para o servidor iniciar a lógica
         elif not self.is_server and self.client:
             self.view.write_to_log("Cliente: Solicitando reinício do jogo ao servidor (Jogar Novamente)...")
             self.client.send_message(StartGameMessage())
@@ -337,7 +336,7 @@ class GameController:
     def _handle_sabotage_choice(self, message: NetworkMessage):
         """Handler para escolha de sabotagem (apenas servidor)."""
         if self.is_server and self.model and self.server and isinstance(message, SabotageChoiceMessage):
-            player_id = message.id_jogador
+            player_id = message.player_id # CORREÇÃO: Usar message.player_id
             sabotage_choice = message.sabotage_choice
 
             with self._current_phase_lock: 
@@ -389,15 +388,12 @@ class GameController:
                         self.model.advance_leader()
                     continue
                 
-                # Verifica se a resposta é um sinal de equipe inválida
                 if team_response is INVALID_TEAM_PROPOSED_SIGNAL:
                     self.view.write_to_log("Proposta de equipe inválida recebida. Líder atual terá outra chance.")
-                    continue # Reinicia o loop sem avançar o líder
+                    continue
                 
-                # Se a resposta é uma equipe válida
-                team_ids = team_response # team_ids agora é a lista de inteiros
+                team_ids = team_response
                 
-                # Este 'if not team_ids' deve ser quase inalcançável com a nova lógica, mas mantido por segurança.
                 if not team_ids: 
                     self.view.write_to_log("Equipe selecionada inválida ou vazia. Avançando líder (fallback).")
                     with self._current_phase_lock:
@@ -482,8 +478,7 @@ class GameController:
         mission_size = self.model.get_current_mission_size() 
         available_ids = list(range(1, self.model.num_players + 1)) 
 
-        # O servidor NÃO é um jogador, então ele NUNCA será o local_player_id para ações de jogo.
-        if leader_id == self.local_player_id: # Esta condição agora sempre será Falsa para o servidor
+        if leader_id == self.local_player_id: # Esta condição sempre será Falsa para o servidor
             self.view.write_to_log(f"Servidor (atuando como Jogador {leader_id}): Solicitando sua seleção de equipe localmente.")
             self.root.after(0, lambda: self.view.show_team_selection_dialog(
                 leader_id=leader_id,
@@ -526,8 +521,7 @@ class GameController:
         """Solicita o voto de um jogador específico."""
         if self.model is None or self.server is None: return 
         
-        # O servidor NÃO é um jogador, então ele NUNCA será o local_player_id para ações de jogo.
-        if player_id_to_vote == self.local_player_id: # Esta condição agora sempre será Falsa para o servidor
+        if player_id_to_vote == self.local_player_id: # Esta condição sempre será Falsa para o servidor
             self.view.write_to_log(f"Servidor (atuando como Jogador {player_id_to_vote}): Solicitando seu voto localmente.")
             self.root.after(0, lambda: self.view.show_vote_dialog(
                 player_id=player_id_to_vote,
@@ -544,8 +538,7 @@ class GameController:
         """Solicita a escolha de sabotagem de um membro da equipe específico."""
         if self.model is None or self.server is None: return 
 
-        # O servidor NÃO é um jogador, então ele NUNCA será o local_player_id para ações de jogo.
-        if player_id_on_mission == self.local_player_id: # Esta condição agora sempre será Falsa para o servidor
+        if player_id_on_mission == self.local_player_id: # Esta condição sempre será Falsa para o servidor
             if is_spy:
                 self.view.write_to_log(f"Servidor (atuando como Jogador {player_id_on_mission}): Solicitando sua escolha de sabotagem localmente.")
                 self.root.after(0, lambda: self.view.show_sabotage_dialog(
@@ -578,7 +571,6 @@ class GameController:
         self._on_model_state_changed()
 
     # --- Callbacks para ações locais do servidor (quando o servidor é o jogador) ---
-    # Esses callbacks não serão mais ativados já que o servidor não é um jogador.
     def _on_team_selected_server_local_callback(self, team_ids: List[int]):
         """Callback acionado quando o líder (servidor local) seleciona um time."""
         self.team_selection_response_queue.put(team_ids)
