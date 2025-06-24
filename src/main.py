@@ -1,21 +1,29 @@
 import tkinter as tk
+from tkinter import ttk, Canvas, messagebox, simpledialog # Import simpledialog para input
 import sys
-import os
+import time
+import os # Importar para manipulação de caminhos de arquivo
 
+from src.views.view import GameView
+from src.models.model import GameModel
 from src.controllers.controller import GameController
-from tkinter import ttk, messagebox
+from src.utils.network import GameServer, GameClient
 from src.utils.settings import (
     GAME_TITLE, FONT_TITLE, FONT_SUBTITLE, FONT_DEFAULT, FONT_HEADING,
     BG_DARK, BG_MEDIUM, BG_MENU, TEXT_ACCENT, TEXT_PRIMARY,
-    BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, BORDER_COLOR
+    BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, NUM_PLAYERS, NUM_SPIES,
+    BORDER_COLOR, SERVER_HOST, SERVER_PORT
 )
 from typing import Optional
+# REMOVIDO: from src.how_to_play_text import how_to_play_text
 
+# Tentar importar winsound para feedback sonoro no Windows
 try:
     import winsound
     _WINSOUND_AVAILABLE = True
 except ImportError:
     _WINSOUND_AVAILABLE = False
+
 
 class MainApplication(tk.Tk):
     def __init__(self):
@@ -29,7 +37,7 @@ class MainApplication(tk.Tk):
         self._current_frame: Optional[tk.Frame] = None
         self._loading_screen: Optional[tk.Toplevel] = None
         self.sound_enabled = tk.BooleanVar(value=True)
-        self.how_to_play_text_content: str = self._load_how_to_play_text()
+        self.how_to_play_text_content: str = self._load_how_to_play_text() # O texto é carregado por este método
 
         self._configure_ttk_style()
         self._show_main_menu()
@@ -37,13 +45,14 @@ class MainApplication(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     def _load_how_to_play_text(self) -> str:
-        script_dir = os.path.dirname(__file__)
+        """Carrega o texto de como jogar de um arquivo .txt."""
+        script_dir = os.path.dirname(__file__) # Pega o diretório do script atual
         file_path = os.path.join(script_dir, 'how_to_play.txt')
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
         except FileNotFoundError:
-            return "Erro: Arquivo 'how_to_play.txt' não encontrado."
+            return "Erro: Arquivo 'how_to_play.txt' não encontrado. Certifique-se de que ele está em src/how_to_play.txt."
         except Exception as e:
             return f"Erro ao carregar o texto de como jogar: {e}"
 
@@ -51,7 +60,6 @@ class MainApplication(tk.Tk):
         style = ttk.Style(self)
         style.theme_use('clam')
 
-        # Botões
         style.configure('TButton',
                         background=BUTTON_BG,
                         foreground=BUTTON_FG,
@@ -59,13 +67,12 @@ class MainApplication(tk.Tk):
                         relief='flat',
                         borderwidth=0,
                         padding=[20, 15],
-                        focusthickness=0, 
+                        focusthickness=0,
                         focuscolor=BUTTON_BG)
         style.map('TButton',
                   background=[('active', BUTTON_HOVER_BG), ('pressed', BUTTON_HOVER_BG)],
                   foreground=[('active', BUTTON_FG)])
 
-        # Labels de título e subtítulo
         style.configure('TLabel',
                         background=BG_MENU,
                         foreground=TEXT_PRIMARY,
@@ -79,18 +86,15 @@ class MainApplication(tk.Tk):
                         foreground=TEXT_PRIMARY,
                         font=FONT_HEADING)
         
-        # Frame (para as seções do menu)
         style.configure('Menu.TFrame',
                         background=BG_MENU)
         
-        # Descrição
         style.configure('Description.TLabel',
                         background=BG_MENU,
                         foreground=TEXT_PRIMARY,
                         font=FONT_DEFAULT,
                         padding=[10, 5])
         
-        # Botões pequenos de opção
         style.configure('Option.TButton',
                         background=BG_MEDIUM,
                         foreground=TEXT_PRIMARY,
@@ -103,7 +107,6 @@ class MainApplication(tk.Tk):
                   background=[('active', TEXT_ACCENT), ('pressed', TEXT_ACCENT)],
                   foreground=[('active', BG_DARK), ('pressed', BG_DARK)])
         
-        # Checkbutton
         style.configure('TCheckbutton',
                         background=BG_MENU,
                         foreground=TEXT_PRIMARY,
@@ -136,10 +139,8 @@ class MainApplication(tk.Tk):
     def _show_main_menu(self):
         self._clear_frame()
 
-        # Título
         ttk.Label(self._current_frame, text=GAME_TITLE, style='Title.TLabel').grid(row=0, column=0, pady=(100, 40), sticky="n")
 
-        # Botões
         ttk.Button(self._current_frame, text="Jogar", command=self._show_play_options).grid(row=2, column=0, pady=10)
         ttk.Button(self._current_frame, text="Como Jogar", command=self._show_how_to_play).grid(row=3, column=0, pady=10)
         ttk.Button(self._current_frame, text="Configurações", command=self._show_settings_menu).grid(row=4, column=0, pady=10)
@@ -155,11 +156,22 @@ class MainApplication(tk.Tk):
 
         ttk.Label(self._current_frame, text="Escolha o Modo de Jogo", style='Heading.TLabel').grid(row=0, column=0, pady=(0, 30))
 
-        ttk.Button(self._current_frame, text="Host (Servidor)", command=lambda: self._trigger_start_game(True), style='Option.TButton').grid(row=1, column=0, pady=15)
-        ttk.Button(self._current_frame, text="Jogador (Cliente)", command=lambda: self._trigger_start_game(False), style='Option.TButton').grid(row=2, column=0, pady=15)
-        ttk.Button(self._current_frame, text="Voltar", command=self._show_main_menu, style='Option.TButton').grid(row=4, column=0, pady=20)
+        ttk.Button(self._current_frame, text="🚀 Servidor (Host)", command=lambda: self._trigger_start_game(True, None)).grid(row=1, column=0, pady=15)
+        ttk.Button(self._current_frame, text="💻 Cliente (Entrar)", command=self._prompt_client_ip).grid(row=2, column=0, pady=15)
+        ttk.Button(self._current_frame, text="Voltar", command=self._show_main_menu).grid(row=4, column=0, pady=20)
         
         self._current_frame.grid_rowconfigure(3, weight=1)
+
+    def _prompt_client_ip(self):
+        """Pede ao usuário o IP do servidor antes de iniciar como cliente."""
+        self._play_sound("click")
+        server_ip = simpledialog.askstring("Conectar ao Servidor", "Digite o IP do servidor (Ex: 192.168.1.100):",
+                                           parent=self, initialvalue="127.0.0.1")
+        if server_ip:
+            self._trigger_start_game(False, server_ip)
+        else:
+            messagebox.showwarning("Conexão", "IP do servidor não fornecido. Não foi possível iniciar como cliente.")
+
 
     def _show_how_to_play(self):
         self._play_sound("click")
@@ -167,8 +179,9 @@ class MainApplication(tk.Tk):
 
         ttk.Label(self._current_frame, text="Como Jogar: The Resistance", style='Title.TLabel').grid(row=0, column=0, pady=(0, 20), sticky="n")
 
-        how_to_play_text_widget = tk.Text(self._current_frame, wrap=tk.WORD, bg=BG_MENU, fg=TEXT_PRIMARY, font=FONT_DEFAULT, relief="flat", padx=20, pady=20)
-        how_to_play_text_widget.insert(tk.END, self.how_to_play_text_content) 
+        how_to_play_text_widget = tk.Text(self._current_frame, wrap=tk.WORD, bg=BG_MENU, fg=TEXT_PRIMARY,
+                                         font=FONT_DEFAULT, relief="flat", padx=20, pady=20)
+        how_to_play_text_widget.insert(tk.END, self.how_to_play_text_content)
         how_to_play_text_widget.config(state=tk.DISABLED)
         how_to_play_text_widget.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
 
@@ -182,20 +195,17 @@ class MainApplication(tk.Tk):
         self._current_frame.grid_columnconfigure(0, weight=1)
 
     def _show_settings_menu(self):
-        """Exibe o menu de configurações."""
         self._play_sound("click")
         self._clear_frame()
 
         ttk.Label(self._current_frame, text="Configurações", style='Title.TLabel').grid(row=0, column=0, pady=(0, 30), sticky="n")
 
-        # Ativar/desativar som
         ttk.Checkbutton(self._current_frame, text="Ativar Som do Jogo", 
                         variable=self.sound_enabled, onvalue=True, offvalue=False,
                         style='TCheckbutton').grid(row=1, column=0, pady=10, sticky="w", padx=50)
 
-        # Botões de ação
-        ttk.Button(self._current_frame, text="Salvar", command=self._save_settings, style='Option.TButton').grid(row=3, column=0, pady=15)
-        ttk.Button(self._current_frame, text="Voltar", command=self._show_main_menu, style='Option.TButton').grid(row=4, column=0, pady=10)
+        ttk.Button(self._current_frame, text="Salvar", command=self._save_settings).grid(row=3, column=0, pady=15)
+        ttk.Button(self._current_frame, text="Voltar", command=self._show_main_menu).grid(row=4, column=0, pady=10)
         
         self._current_frame.grid_rowconfigure(2, weight=1)
 
@@ -204,10 +214,11 @@ class MainApplication(tk.Tk):
         messagebox.showinfo("Configurações", "Configurações salvas com sucesso!")
         self._show_main_menu()
 
-    def _trigger_start_game(self, is_server: bool):
+    def _trigger_start_game(self, is_server: bool, server_ip: Optional[str] = None):
+        """Prepara e inicia o jogo, mostrando uma tela de carregamento."""
         self._play_sound("start_game")
         self._show_loading_screen()
-        self.after(100, lambda: self._start_game(is_server))
+        self.after(100, lambda: self._start_game(is_server, server_ip))
 
     def _show_loading_screen(self):
         self._loading_screen = tk.Toplevel(self)
@@ -231,9 +242,10 @@ class MainApplication(tk.Tk):
             self._loading_screen.destroy()
             self._loading_screen = None
 
-    def _start_game(self, is_server: bool):
+    def _start_game(self, is_server: bool, server_ip: Optional[str] = None):
+        """Inicia a aplicação do jogo (GameController e GameView)."""
         self._clear_frame()
-        self.controller = GameController(self, is_server)
+        self.controller = GameController(self, is_server, server_ip)
         self._hide_loading_screen()
 
     def _on_closing(self):

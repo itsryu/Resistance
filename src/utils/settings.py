@@ -32,7 +32,7 @@ NUM_SPIES = 2
 MISSION_SIZES = [2, 3, 2, 3, 3] # Tamanhos das missões para 5 jogadores
 
 # Configurações de Rede
-SERVER_HOST = '127.0.0.1'
+SERVER_HOST = 'localhost'
 SERVER_PORT = 12345
 BUFFER_SIZE = 4096
 

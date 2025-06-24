@@ -7,7 +7,7 @@ import os
 from collections import defaultdict
 import traceback
 
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Any, Tuple, Optional, Callable
 
 from src.models.model import GameModel
 from src.views.view import GameView
@@ -21,7 +21,8 @@ from src.utils.settings import (
 from src.models.messages import (
     NetworkMessage, ConnectAckMessage, GameStateUpdateMessage, StartGameMessage,
     PlayerRoleMessage, RequestTeamSelectionMessage, TeamProposedMessage, RequestVoteMessage,
-    VoteCastMessage, RequestSabotageMessage, SabotageChoiceMessage,GameOverMessage, LogMessage
+    VoteCastMessage, RequestSabotageMessage, SabotageChoiceMessage, MissionOutcomeMessage,
+    GameOverMessage, LogMessage, create_message_from_dict
 )
 
 
@@ -31,7 +32,7 @@ class GameController:
     o Model e a View, gerenciando o fluxo do jogo, as entradas do usuário
     e as interações de rede.
     """
-    def __init__(self, root: tk.Tk, is_server: bool):
+    def __init__(self, root: tk.Tk, is_server: bool, server_ip: Optional[str] = None): # Adicionado server_ip
         self.root: tk.Tk = root
         self.is_server: bool = is_server
         self.view: GameView = GameView(root)
@@ -40,6 +41,7 @@ class GameController:
         self.model: Optional[GameModel] = None
         self.server: Optional[GameServer] = None
         self.client: Optional[GameClient] = None
+        self.server_target_ip = server_ip # Armazena o IP alvo para o cliente
 
         self.players: List[Player] = []
         self.connected_player_ids: List[int] = []
@@ -87,9 +89,10 @@ class GameController:
             
             self.local_player_id = 1 
 
-            self.server = GameServer(SERVER_HOST, SERVER_PORT, self._on_client_connected)
+            # O servidor sempre ouve em '0.0.0.0' para aceitar conexões de qualquer IP local
+            self.server = GameServer('0.0.0.0', SERVER_PORT, self._on_client_connected)
             self.server.start()
-            self.view.write_to_log(f"MODO SERVIDOR INICIADO em {SERVER_HOST}:{SERVER_PORT}")
+            self.view.write_to_log(f"MODO SERVIDOR INICIADO em 0.0.0.0:{SERVER_PORT} (acesível via IP local da máquina)")
             
             if self.model.game_started and not self.model.is_game_over():
                 self.view.action_button.config(text="Jogo em Andamento...", state=tk.DISABLED)
@@ -101,8 +104,10 @@ class GameController:
                 self.view.write_to_log(f"Aguardando {NUM_PLAYERS} jogadores se conectarem...")
             
         else:
-            self.client = GameClient(SERVER_HOST, SERVER_PORT)
-            self.view.write_to_log(f"MODO CLIENTE: Conectando a {SERVER_HOST}:{SERVER_PORT}...")
+            # O cliente tenta conectar ao IP fornecido por MainApplication ou SERVER_HOST (127.0.0.1) como fallback
+            target_ip = self.server_target_ip if self.server_target_ip else SERVER_HOST
+            self.client = GameClient(target_ip, SERVER_PORT)
+            self.view.write_to_log(f"MODO CLIENTE: Conectando a {target_ip}:{SERVER_PORT}...")
             self.view.action_button.config(text="Conectando...", state=tk.DISABLED)
             
             threading.Thread(target=self._connect_client_loop, daemon=True).start()
@@ -257,11 +262,13 @@ class GameController:
             self.view.write_to_log("Servidor: Iniciando processo de início/reinício do jogo...")
             start_msg = StartGameMessage()
             self.server.send_to_all_clients(start_msg)
+            # Adicionado: Processa a mensagem localmente para o servidor iniciar a lógica do jogo
             self._dispatch_message(start_msg)
         elif not self.is_server and self.client:
             self.view.write_to_log("Cliente: Solicitando reinício do jogo ao servidor (Jogar Novamente)...")
             self.client.send_message(StartGameMessage())
 
+    # --- Server-side message handlers (received from clients) ---
     def _handle_start_game_request(self, message: NetworkMessage):
         """Handler para solicitação de início de jogo (apenas servidor)."""
         if self.is_server and self.model and self.server and isinstance(message, StartGameMessage):
@@ -336,21 +343,34 @@ class GameController:
             player_id = message.player_id
             sabotage_choice = message.sabotage_choice
 
+            # Adquire o lock para verificar e modificar o estado do modelo de forma segura.
+            # Este lock garante atomicidade para a verificação e a atualização do modelo.
             with self._current_phase_lock: 
+                # Verifica se a thread de lógica do jogo está atualmente aguardando a escolha de sabotagem deste jogador.
+                # Isso implica uma fase/turno válido para sabotagem.
                 is_valid_turn_for_sabotage_queue = (player_id in self.sabotage_response_queues)
                 
+                # Verifica se o jogador faz parte da equipe atualmente proposta.
                 is_on_proposed_team = self.model.proposed_team and player_id in self.model.proposed_team
                 
+                # Só prossegue se for um turno válido E o jogador estiver na equipe da missão.
                 if is_valid_turn_for_sabotage_queue and is_on_proposed_team:
+                    # Coloca a escolha na fila PRIMEIRO, para desbloquear a thread de lógica do jogo
                     self.sabotage_response_queues[player_id].put(sabotage_choice)
                     
+                    # Registra a sabotagem no modelo. Esta operação em si já é protegida por este lock.
                     self.model.record_sabotage(sabotage_choice)
                     
                     sabotage_str = "SABOTOU" if sabotage_choice else "NÃO sabotou"
                     self.server.send_to_all_clients(LogMessage(text=f"Jogador {player_id} {sabotage_str} a missão!"))
                 else:
+                    # Se o jogador não deveria enviar uma escolha de sabotagem agora,
+                    # ou não está na equipe da missão, envia uma mensagem de escolha inválida de volta.
                     self.server.send_to_client(player_id, LogMessage(text="Você não está nesta missão ou sua escolha é inválida."))
+                    # Importante: NÃO coloca na fila neste caso, pois a thread de lógica do jogo não está esperando
+                    # uma resposta deste jogador para esta ação ou já atingiu o tempo limite.
 
+    # --- Server Game Logic (executed in a separate thread) ---
     def _run_game_logic_server(self):
         """Thread que orquestra o fluxo do jogo no servidor."""
         try:
@@ -394,6 +414,7 @@ class GameController:
                 
                 self.view.write_to_log(f"Lógica do servidor recebeu Seleção de Equipe: {team_ids}")
 
+                # --- FASE DE VOTAÇÃO ---
                 self.view.write_to_log("Lógica do servidor iniciando coleta de votos...")
                 
                 for player_to_vote_obj in self.players:
@@ -453,6 +474,8 @@ class GameController:
             self.view.write_to_log(f"ERRO FATAL na thread de lógica do jogo: {e}")
             traceback.print_exc()
 
+
+    # --- Server: Game Phase Management (Auxiliary methods for main logic thread) ---
     def _start_new_round_server_sync(self):
         """Inicia uma nova rodada no servidor, sincronizada com a thread de lógica."""
         if self.model is None or self.server is None: return
@@ -559,6 +582,7 @@ class GameController:
         self.model.game_started = False 
         self._on_model_state_changed()
 
+    # --- Callbacks para ações locais do servidor (quando o servidor é o jogador) ---
     def _on_team_selected_server_local_callback(self, team_ids: List[int]):
         """Callback acionado quando o líder (servidor local) seleciona um time."""
         self.team_selection_response_queue.put(team_ids)
@@ -579,6 +603,8 @@ class GameController:
             self.view.write_to_log(f"Servidor (local Jogador {self.local_player_id}): Escolha de sabotagem: {sabotage_choice}.")
         else:
             self.view.write_to_log("Erro: ID do jogador local não definido ou fila de sabotagem não encontrada para callback de sabotagem local.")
+
+    # --- Client Logic to respond to server requests ---
 
     def _handle_request_team_selection(self, message: NetworkMessage):
         """Manipulador para solicitação de seleção de equipe (apenas lado do cliente, se o jogador local for o líder)."""
