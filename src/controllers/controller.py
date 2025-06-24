@@ -268,7 +268,7 @@ class GameController:
             self.view.write_to_log("Servidor: Iniciando processo de início/reinício do jogo...")
             start_msg = StartGameMessage()
             self.server.send_to_all_clients(start_msg)
-            self._dispatch_message(start_msg) # Processa localmente para o servidor iniciar a lógica
+            self._dispatch_message(start_msg)
         elif not self.is_server and self.client:
             self.view.write_to_log("Cliente: Solicitando reinício do jogo ao servidor (Jogar Novamente)...")
             self.client.send_message(StartGameMessage())
@@ -306,9 +306,8 @@ class GameController:
                        not all(1 <= p_id <= self.model.num_players for p_id in team_ids) or \
                        len(set(team_ids)) != len(team_ids):
                         self.server.send_to_client(leader_id, LogMessage(text="Seleção de equipe inválida. Por favor, tente novamente."))
-                        # Envia sinal para a thread de lógica do jogo para tentar novamente com o mesmo líder
                         self.team_selection_response_queue.put(INVALID_TEAM_PROPOSED_SIGNAL)
-                        return # Sai do handler, a thread de lógica irá consumir o sinal
+                        return
                     
                     # Se a equipe é válida
                     self.model.set_proposed_team(team_ids)
@@ -336,7 +335,7 @@ class GameController:
     def _handle_sabotage_choice(self, message: NetworkMessage):
         """Handler para escolha de sabotagem (apenas servidor)."""
         if self.is_server and self.model and self.server and isinstance(message, SabotageChoiceMessage):
-            player_id = message.player_id # CORREÇÃO: Usar message.player_id
+            player_id = message.player_id
             sabotage_choice = message.sabotage_choice
 
             with self._current_phase_lock: 
@@ -375,6 +374,8 @@ class GameController:
             self.view.write_to_log(f"Thread de lógica do jogo ativa. Iniciando loop do jogo. Rodada atual: {self.model.current_round + 1}")
 
             while not self.model.is_game_over():
+                # Atualiza o timer na View principal antes de cada fase de input que tem timeout
+                self.root.after(100, lambda: self.view.update_timer(60)) # Tempo para seleção de equipe
                 self.root.after(100, self._start_new_round_server_sync)
 
                 self.view.write_to_log(f"Lógica do servidor aguardando Seleção de Equipe do Jogador {self.model.current_leader_id}...")
@@ -383,13 +384,15 @@ class GameController:
                 try:
                     team_response = self.team_selection_response_queue.get(timeout=60)
                 except queue.Empty:
-                    self.view.write_to_log("Tempo esgotado: Nenhuma equipe proposta pelo líder. Avançando líder.")
+                    self.view.write_to_log(f"Tempo esgotado: Jogador {self.model.current_leader_id} (Líder) não propôs equipe. Avançando líder.")
                     with self._current_phase_lock:
                         self.model.advance_leader()
+                    self.root.after(0, lambda: self.view.update_timer(0)) # Limpa o timer
                     continue
                 
                 if team_response is INVALID_TEAM_PROPOSED_SIGNAL:
                     self.view.write_to_log("Proposta de equipe inválida recebida. Líder atual terá outra chance.")
+                    self.root.after(0, lambda: self.view.update_timer(0)) # Limpa o timer
                     continue
                 
                 team_ids = team_response
@@ -398,9 +401,11 @@ class GameController:
                     self.view.write_to_log("Equipe selecionada inválida ou vazia. Avançando líder (fallback).")
                     with self._current_phase_lock:
                         self.model.advance_leader()
+                    self.root.after(0, lambda: self.view.update_timer(0)) # Limpa o timer
                     continue
                 
                 self.view.write_to_log(f"Lógica do servidor recebeu Equipe Selecionada: {team_ids}")
+                self.root.after(0, lambda: self.view.update_timer(0)) # Limpa o timer
 
                 # --- FASE DE VOTAÇÃO ---
                 self.view.write_to_log("Lógica do servidor iniciando coleta de votos...")
@@ -410,13 +415,15 @@ class GameController:
                     self.vote_response_queues[player_id] = self.vote_response_queues[player_id]
 
                     self.root.after(100, lambda p=player_id: self._request_next_vote_server(p, team_ids))
+                    self.root.after(100, lambda: self.view.update_timer(30)) # Tempo para votação
                     try:
                         vote_choice = self.vote_response_queues[player_id].get(timeout=30)
-                        self.view.write_to_log(f"Voto recebido do Jogador {player_id}: {vote_choice}")
+                        self.view.write_to_log(f"Voto recebido do Jogador {player_id}: {vote_choice}.")
                     except queue.Empty:
                         self.view.write_to_log(f"Tempo esgotado: Jogador {player_id} não votou. Assumindo NÃO.")
                         with self._current_phase_lock:
                             self.model.record_vote(False)
+                    self.root.after(0, lambda: self.view.update_timer(0)) # Limpa o timer
 
                 with self._current_phase_lock:
                     team_approved = self.model.process_team_vote()
@@ -434,6 +441,7 @@ class GameController:
                             self.sabotage_response_queues[player_obj_on_mission.player_id] = self.sabotage_response_queues[player_obj_on_mission.player_id]
 
                             self.root.after(100, lambda p=player_obj_on_mission.player_id: self._request_next_sabotage_server(p, True))
+                            self.root.after(100, lambda: self.view.update_timer(30)) # Tempo para sabotagem
                             try:
                                 sabotage_choice = self.sabotage_response_queues[player_obj_on_mission.player_id].get(timeout=30)
                                 self.view.write_to_log(f"Escolha de sabotagem recebida do Jogador {player_obj_on_mission.player_id}: {sabotage_choice}.")
@@ -441,6 +449,7 @@ class GameController:
                                 self.view.write_to_log(f"Tempo esgotado: Espião Jogador {player_obj_on_mission.player_id} não escolheu sabotar. Assumindo NÃO.")
                                 with self._current_phase_lock:
                                     self.model.record_sabotage(False)
+                            self.root.after(0, lambda: self.view.update_timer(0)) # Limpa o timer
                         elif player_obj_on_mission:
                             self.view.write_to_log(f"Jogador {player_obj_on_mission.player_id} (Resistência) não pode sabotar. Assumindo NÃO.")
                             with self._current_phase_lock:
@@ -456,6 +465,7 @@ class GameController:
                         self.model.advance_leader()
                     
                 self.view.write_to_log("Fim da iteração do loop de jogo atual. Verificando condição de fim de jogo.")
+                self.root.after(0, lambda: self.view.update_timer(0)) # Garante que o timer seja limpo no final da rodada
 
             self.root.after(100, self._end_game_server)
         except Exception as e:
@@ -472,7 +482,9 @@ class GameController:
             return
 
         self.server.send_to_all_clients(GameStateUpdateMessage(state=self.model.get_game_state_for_client()))
-        self.server.send_to_all_clients(LogMessage(text=f"\nRodada {self.model.current_round + 1} -- Líder: Jogador {self.model.current_leader_id}"))
+        self.server.send_to_all_clients(LogMessage(text=f"\n--- INÍCIO DA RODADA {self.model.current_round + 1} ---"))
+        self.server.send_to_all_clients(LogMessage(text=f"Líder da Rodada: Jogador {self.model.current_leader_id}"))
+        self.server.send_to_all_clients(LogMessage(text=f"Jogador {self.model.current_leader_id}, por favor, proponha uma equipe de {self.model.get_current_mission_size()} jogadores."))
 
         leader_id = self.model.current_leader_id 
         mission_size = self.model.get_current_mission_size() 
@@ -484,7 +496,8 @@ class GameController:
                 leader_id=leader_id,
                 mission_size=mission_size,
                 available_players_ids=available_ids,
-                callback=self._on_team_selected_server_local_callback
+                callback=self._on_team_selected_server_local_callback,
+                timeout=60 # Passa o timeout
             ))
         else: # Envia requisição para um cliente remoto
             self.server.send_to_client(leader_id, RequestTeamSelectionMessage(
@@ -526,7 +539,8 @@ class GameController:
             self.root.after(0, lambda: self.view.show_vote_dialog(
                 player_id=player_id_to_vote,
                 team=team_ids,
-                callback=self._on_vote_cast_server_local_callback
+                callback=self._on_vote_cast_server_local_callback,
+                timeout=30 # Passa o timeout
             ))
         else: # Envia requisição para um cliente remoto
             self.server.send_to_client(player_id_to_vote, RequestVoteMessage(
@@ -543,7 +557,8 @@ class GameController:
                 self.view.write_to_log(f"Servidor (atuando como Jogador {player_id_on_mission}): Solicitando sua escolha de sabotagem localmente.")
                 self.root.after(0, lambda: self.view.show_sabotage_dialog(
                     player_id=player_id_on_mission,
-                    callback=self._on_sabotage_choice_server_local_callback
+                    callback=self._on_sabotage_choice_server_local_callback,
+                    timeout=30 # Passa o timeout
                 ))
             else:
                 self.view.write_to_log(f"Servidor (atuando como Jogador {player_id_on_mission}, Resistência): Não pode sabotar. Escolha local é Falso.")
@@ -605,7 +620,8 @@ class GameController:
                 leader_id=leader_id,
                 mission_size=mission_size,
                 available_players_ids=available_players_ids,
-                callback=self._on_team_selected_client_callback
+                callback=self._on_team_selected_client_callback,
+                timeout=60 # Passa o timeout
             )
         else:
             if not self.is_server and isinstance(message, RequestTeamSelectionMessage):
@@ -628,7 +644,8 @@ class GameController:
             self.view.show_vote_dialog(
                 player_id=self.local_player_id, 
                 team=team, 
-                callback=self._on_vote_cast_client_callback
+                callback=self._on_vote_cast_client_callback,
+                timeout=30 # Passa o timeout
             )
         else:
             if not self.is_server and isinstance(message, RequestVoteMessage):
@@ -649,7 +666,8 @@ class GameController:
             if self.local_player_role == "Espião":
                 self.view.show_sabotage_dialog(
                     player_id=self.local_player_id, 
-                    callback=self._on_sabotage_choice_client_callback
+                    callback=self._on_sabotage_choice_client_callback,
+                    timeout=30 # Passa o timeout
                 )
             else:
                 self.view.write_to_log("Você é Resistência, você não pode sabotar. Enviando 'Não' ao servidor.")
