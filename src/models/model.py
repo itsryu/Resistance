@@ -1,11 +1,10 @@
-# src/models/model.py
 import random
 from typing import List, Dict, Any, Callable, Optional
 
 class Player:
     def __init__(self, player_id: int, role: str):
         self.player_id = player_id
-        self.role = role # "Resistência" ou "Espião"
+        self.role = role
         self.is_spy = (role == "Espião")
 
     def to_dict(self):

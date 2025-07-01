@@ -75,6 +75,7 @@ class GameServer(Network):
     def start(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(0.5)
+
         try:
             self._socket.bind((self._host, self._port))
             self._socket.listen(5)
@@ -90,6 +91,7 @@ class GameServer(Network):
             try:
                 conn, addr = self._socket.accept() # type: ignore
                 conn.setblocking(True)
+                
                 with self._lock:
                     self._client_id_counter += 1
                     player_id = self._client_id_counter

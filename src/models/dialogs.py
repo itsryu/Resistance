@@ -3,7 +3,6 @@ from tkinter import messagebox, Toplevel, Label, Button
 from typing import List, Any, Callable, Optional, Dict
 from src.utils.settings import BG_DARK, BG_MEDIUM, TEXT_PRIMARY, TEXT_ACCENT, FONT_TITLE, FONT_DEFAULT, BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, GAME_TITLE, FONT_SUBTITLE, BG_LIGHT, ERROR_COLOR
 
-
 class CustomDialog(tk.Toplevel):
     """
     Classe base para diálogos personalizados, fornecendo estilos comuns
@@ -72,13 +71,9 @@ class CustomDialog(tk.Toplevel):
             self.timer_label.config(fg=ERROR_COLOR) 
 
     def _on_timeout(self):
-        """Ação a ser executada quando o temporizador atinge zero.
-        Deve ser sobrescrito por classes filhas.
-        """
+        """Ação a ser executada quando o temporizador atinge zero. Deve ser sobrescrito por classes filhas."""
         if not self._callback_executed:
             self._callback_executed = True
-            
-            
             self._finish_dialog()
 
 
@@ -109,11 +104,8 @@ class TeamSelectionDialog(CustomDialog):
     """
     Diálogo para o líder selecionar os membros da missão, utilizando botões para seleção.
     """
-    def __init__(self, parent: tk.Tk, leader_id: int, mission_size: int,
-                 available_players_ids: List[int], callback: Callable[[Optional[List[int]]], None], timeout: int = 60):
-        super().__init__(parent, f"Seleção de Equipe - Jogador {leader_id}",
-                         f"Jogador {leader_id}, clique nos jogadores para selecionar {mission_size} para a missão.",
-                         timeout)
+    def __init__(self, parent: tk.Tk, leader_id: int, mission_size: int, available_players_ids: List[int], callback: Callable[[Optional[List[int]]], None], timeout: int = 60):
+        super().__init__(parent, f"Seleção de Equipe - Jogador {leader_id}", f"Jogador {leader_id}, clique nos jogadores para selecionar {mission_size} para a missão.", timeout)
         self.leader_id = leader_id
         self.mission_size = mission_size
         self.available_players_ids = available_players_ids
@@ -123,8 +115,7 @@ class TeamSelectionDialog(CustomDialog):
 
         self._create_player_selection_ui()
 
-        self.selected_count_label = Label(self, text=self._get_selected_count_text(), 
-                                          font=FONT_DEFAULT, fg=TEXT_PRIMARY, bg=BG_DARK)
+        self.selected_count_label = Label(self, text=self._get_selected_count_text(), font=FONT_DEFAULT, fg=TEXT_PRIMARY, bg=BG_DARK)
         self.selected_count_label.pack(pady=10)
 
         confirm_button = Button(self, text="Confirmar Equipe", font=FONT_DEFAULT,
@@ -256,8 +247,7 @@ class MissionOutcomeDialog(CustomDialog):
         
         super().__init__(parent, title, message, timeout=5) 
 
-        ok_button = Button(self, text="OK", font=FONT_DEFAULT,
-                           bg=BUTTON_BG, fg=BUTTON_FG, relief="flat", command=self._on_confirm_outcome)
+        ok_button = Button(self, text="OK", font=FONT_DEFAULT, bg=BUTTON_BG, fg=BUTTON_FG, relief="flat", command=self._on_confirm_outcome)
         ok_button.pack(pady=10)
         ok_button.bind("<Enter>", lambda e: e.widget.config(bg=BUTTON_HOVER_BG))
         ok_button.bind("<Leave>", lambda e: e.widget.config(bg=BUTTON_BG))
@@ -281,7 +271,6 @@ class MissionOutcomeDialog(CustomDialog):
 
 class GameOverDetailsDialog(CustomDialog):
     def __init__(self, parent: tk.Tk, winner: str, mission_results: List[str], resistance_wins: int, spy_wins: int):
-        
         super().__init__(parent, "Fim de Jogo", f"O vencedor é: {winner}!", timeout=0) 
 
         self.geometry("450x450") 
@@ -292,12 +281,10 @@ class GameOverDetailsDialog(CustomDialog):
         results_heading = Label(self, text="Resultados das Missões:", font=FONT_SUBTITLE, fg=TEXT_PRIMARY, bg=BG_DARK)
         results_heading.pack(pady=(10, 5))
 
-        
         results_frame = tk.Frame(self, bg=BG_LIGHT, bd=1, relief="solid")
         results_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
 
-        results_text_widget = tk.Text(results_frame, font=FONT_DEFAULT, fg=TEXT_PRIMARY, bg=BG_LIGHT,
-                                       wrap=tk.WORD, height=len(mission_results) + 1, relief="flat", bd=0)
+        results_text_widget = tk.Text(results_frame, font=FONT_DEFAULT, fg=TEXT_PRIMARY, bg=BG_LIGHT, wrap=tk.WORD, height=len(mission_results) + 1, relief="flat", bd=0)
         results_text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         results_text_widget.insert(tk.END, "\n".join([f"Missão {i+1}: {res}" for i, res in enumerate(mission_results)]))
         results_text_widget.config(state=tk.DISABLED) 
@@ -309,8 +296,7 @@ class GameOverDetailsDialog(CustomDialog):
         score_label = Label(self, text=f"Placar: Resistência {resistance_wins} x {spy_wins} Espiões", font=FONT_SUBTITLE, fg=TEXT_PRIMARY, bg=BG_DARK)
         score_label.pack(pady=(15, 20))
 
-        ok_button = Button(self, text="OK", font=FONT_DEFAULT,
-                           bg=BUTTON_BG, fg=BUTTON_FG, relief="flat", command=self._on_confirm_game_over)
+        ok_button = Button(self, text="OK", font=FONT_DEFAULT, bg=BUTTON_BG, fg=BUTTON_FG, relief="flat", command=self._on_confirm_game_over)
         ok_button.pack(pady=10)
         ok_button.bind("<Enter>", lambda e: e.widget.config(bg=BUTTON_HOVER_BG))
         ok_button.bind("<Leave>", lambda e: e.widget.config(bg=BUTTON_BG))

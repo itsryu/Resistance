@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Optional, Dict, Any
 if TYPE_CHECKING:
     from src.views.view import GameView
 
-
 class Player(threading.Thread):
     def __init__(self, player_id: int, role: str):
         super().__init__()

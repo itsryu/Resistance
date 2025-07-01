@@ -28,7 +28,7 @@ BORDER_RADIUS = 5
 GAME_TITLE = "The Resistance"
 NUM_PLAYERS = 5
 NUM_SPIES = 2
-MISSION_SIZES = [2, 3, 2, 3, 3] # Tamanhos das missões para 5 jogadores
+MISSION_SIZES = [2, 3, 2, 3, 3]
 
 # Configurações de Rede
 SERVER_HOST = 'localhost'

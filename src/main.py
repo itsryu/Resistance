@@ -239,6 +239,7 @@ class MainApplication(tk.Tk):
     def _on_closing(self):
         self._play_sound("click")
         print("Fechando aplicação...")
+
         if self.controller:
             if self.controller.is_server and self.controller.server:
                 self.controller.server.stop()
@@ -246,6 +247,7 @@ class MainApplication(tk.Tk):
             elif not self.controller.is_server and self.controller.client:
                 self.controller.client.stop()
                 print("Cliente de rede parado.")
+                
         self.destroy()
         sys.exit(0)
 

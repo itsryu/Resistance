@@ -1,4 +1,5 @@
 import tkinter as tk
+
 from tkinter import Canvas, ttk
 from typing import List, Callable, Optional, Dict, Any
 from src.utils.settings import (
@@ -29,7 +30,7 @@ class GameView:
 
         self._player_info_label_canvas_item: Optional[int] = None 
 
-        self._configure_ttk_style() # Configura o estilo TTK
+        self._configure_ttk_style()
         self._initialize_ui_components()
 
     def _configure_ttk_style(self):
@@ -45,6 +46,7 @@ class GameView:
                         relief='flat',
                         borderwidth=0,
                         padding=10)
+        
         style.map('TButton',
                   background=[('active', BUTTON_HOVER_BG), ('pressed', BUTTON_HOVER_BG)],
                   foreground=[('active', BUTTON_FG)])
@@ -64,6 +66,7 @@ class GameView:
                         gripcount=0,
                         bordercolor=BG_DARK,
                         arrowcolor=TEXT_PRIMARY)
+        
         style.map('Vertical.TScrollbar',
                   background=[('active', TEXT_ACCENT)],
                   arrowcolor=[('active', BG_DARK)])
@@ -87,14 +90,12 @@ class GameView:
         
         role_str = "ESPIÃO" if self.local_player_role == "Espião" else "RESISTÊNCIA"
         role_color = TEXT_ACCENT if self.local_player_role == "Espião" else TEXT_PRIMARY
-        self.player_info_label.config(text=f"Você é o Jogador {self.local_player_id} - {role_str}",
-                                     fg=role_color)
+        self.player_info_label.config(text=f"Você é o Jogador {self.local_player_id} - {role_str}",fg=role_color)
         self.write_to_log(f"Seu ID de Jogador: {self.local_player_id}")
         self.write_to_log(f"Seu Papel: {role_str}")
 
     def _initialize_ui_components(self):
         """Cria e organiza todos os widgets da interface, com melhorias de design."""
-        # Main frame para grid layout
         main_frame = tk.Frame(self.root, bg=BG_DARK) 
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
@@ -128,8 +129,7 @@ class GameView:
         self.player_info_canvas.grid(row=0, column=0, sticky="nsew")
         self.player_info_canvas.bind("<Configure>", self._resize_player_info_canvas)
         
-        self.player_info_label = tk.Label(self.player_info_canvas, text="ID do Jogador: N/A - Papel: Desconhecido", 
-                                          font=FONT_SUBTITLE, fg=TEXT_PRIMARY, bg=BG_MEDIUM)
+        self.player_info_label = tk.Label(self.player_info_canvas, text="ID do Jogador: N/A - Papel: Desconhecido", font=FONT_SUBTITLE, fg=TEXT_PRIMARY, bg=BG_MEDIUM)
         self._player_info_label_canvas_item = self.player_info_canvas.create_window(0, 0, window=self.player_info_label, anchor="center")
 
         # Espaçamento
@@ -159,9 +159,7 @@ class GameView:
         tk.Frame(main_frame, height=15, bg=BG_DARK).grid(row=5, column=0)
 
         # Botão de Ação Principal (usando ttk.Button)
-        self.action_button = ttk.Button(main_frame, text="Aguardando Conexão...", 
-                                   command=self._on_action_button_click, 
-                                   style='TButton') 
+        self.action_button = ttk.Button(main_frame, text="Aguardando Conexão...", command=self._on_action_button_click, style='TButton')
         self.action_button.grid(row=6, column=0, pady=(15, 25), ipadx=30, ipady=15)
         self.action_button.config(state=tk.DISABLED) 
 
@@ -171,8 +169,7 @@ class GameView:
         self.log_frame.grid_rowconfigure(0, weight=1)
         self.log_frame.grid_columnconfigure(0, weight=1)
 
-        self.log_text = tk.Text(self.log_frame, bg=BG_LIGHT, fg=TEXT_PRIMARY, font=FONT_LOG,
-                                relief="flat", bd=0, padx=15, pady=15, wrap=tk.WORD) 
+        self.log_text = tk.Text(self.log_frame, bg=BG_LIGHT, fg=TEXT_PRIMARY, font=FONT_LOG, relief="flat", bd=0, padx=15, pady=15, wrap=tk.WORD) 
         self.log_text.grid(row=0, column=0, sticky="nsew")
         self.log_text.config(state=tk.DISABLED) 
 
@@ -193,9 +190,7 @@ class GameView:
         self._resize_player_info_canvas(None)
 
     def show_mission_outcome_dialog(self, success: bool, sabotages_count: int):
-        """
-        Exibe um diálogo modal com o resultado da missão e o número de sabotagens.
-        """
+        """Exibe um diálogo modal com o resultado da missão e o número de sabotagens."""
         if self.local_player_id:
             title = "Missão Bem-Sucedida!" if success else "Missão Falhou!"
             message = "A Resistência obteve sucesso na missão!" if success else f"Os Espiões sabotaram a missão com {sabotages_count} falha(s)!"
@@ -208,13 +203,9 @@ class GameView:
             self.action_button.config(text="Processando...", state=tk.DISABLED)
             
             style = ttk.Style()
-            style.map('TButton', background=[('active', TEXT_ACCENT), ('!active', TEXT_ACCENT)],
-                                 foreground=[('active', BG_DARK), ('!active', BG_DARK)])
-            
-            self.root.after(300, lambda: style.map('TButton', background=[('active', BUTTON_HOVER_BG), ('!active', BUTTON_BG)],
-                                                               foreground=[('active', BUTTON_FG), ('!active', BUTTON_FG)]))
+            style.map('TButton', background=[('active', TEXT_ACCENT), ('!active', TEXT_ACCENT)],foreground=[('active', BG_DARK), ('!active', BG_DARK)])
+            self.root.after(300, lambda: style.map('TButton', background=[('active', BUTTON_HOVER_BG), ('!active', BUTTON_BG)], foreground=[('active', BUTTON_FG), ('!active', BUTTON_FG)]))
             self.root.after(500, lambda: self.action_button.config(text=original_text, state=tk.NORMAL))
-
             self.root.after(500, self.controller.request_start_game)
 
 
@@ -232,6 +223,7 @@ class GameView:
                   x1, y2-radius,
                   x1, y1+radius,
                   x1, y1]
+        
         return canvas.create_polygon(points, smooth=True, **kwargs)
 
     def _resize_player_info_canvas(self, event):
@@ -241,9 +233,7 @@ class GameView:
 
         if canvas_width > 10 and canvas_height > 10:
             self.player_info_canvas.delete("round_rect")
-            self._round_rectangle(self.player_info_canvas, 5, 5, 
-                                  canvas_width-5, canvas_height-5, 
-                                  radius=BORDER_RADIUS, fill=BG_MEDIUM, outline=BORDER_COLOR, width=2, tags="round_rect")
+            self._round_rectangle(self.player_info_canvas, 5, 5, canvas_width-5, canvas_height-5, radius=BORDER_RADIUS, fill=BG_MEDIUM, outline=BORDER_COLOR, width=2, tags="round_rect")
             if self._player_info_label_canvas_item:
                 self.player_info_canvas.coords(self._player_info_label_canvas_item, canvas_width/2, canvas_height/2)
         
@@ -258,9 +248,7 @@ class GameView:
         self.log_text.config(state=tk.DISABLED) 
 
     def update_view(self, game_state: Dict[str, Any]):
-        """
-        Atualiza a View com o estado mais recente do Modelo recebido do servidor.
-        """
+        """Atualiza a View com o estado mais recente do Modelo recebido do servidor."""
         self.game_state_data = game_state
 
         current_round = self.game_state_data.get('current_round', 0)
@@ -282,8 +270,7 @@ class GameView:
             self.action_button.config(state=tk.DISABLED, text="Aguardando Outros Jogadores...")
 
 
-    def show_team_selection_dialog(self, leader_id: int, mission_size: int,
-                                   available_players_ids: List[int], callback: Callable[[List[int]], None], timeout: int = 60):
+    def show_team_selection_dialog(self, leader_id: int, mission_size: int, available_players_ids: List[int], callback: Callable[[List[int]], None], timeout: int = 60):
         """Exibe o diálogo de seleção de time e espera pelo input do líder local."""
         TeamSelectionDialog(self.root, leader_id, mission_size, available_players_ids, callback, timeout)
 
