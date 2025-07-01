@@ -1,5 +1,3 @@
-import tkinter as tk
-from typing import List, Dict, Any, Callable, Optional, Tuple
 from enum import Enum
 
 BG_DARK = "#1a1a1a"          # Fundo principal
@@ -24,7 +22,7 @@ FONT_HEADING = (FONT_FAMILY, 14, "bold")    # Títulos de seção
 FONT_DEFAULT = (FONT_FAMILY, 12)            # Texto geral
 FONT_LOG = ("Courier New", 10)              # Fonte monoespaçada para logs
 
-BORDER_RADIUS = 5 # Simulado com `relief` e `bd` para um visual mais suave
+BORDER_RADIUS = 5
 
 # Configurações do Jogo
 GAME_TITLE = "The Resistance"
@@ -37,7 +35,7 @@ SERVER_HOST = 'localhost'
 SERVER_PORT = 12345
 BUFFER_SIZE = 4096
 
-# Caminho do arquivo de salvamento do estado do jogo (apenas para o servidor)
+# Caminho do arquivo de salvamento do estado do jogo
 SAVE_FILE_PATH = "game_state.json"
 
 # Tipos de Mensagem do Protocolo como Enum

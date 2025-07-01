@@ -17,7 +17,6 @@ try:
 except ImportError:
     _WINSOUND_AVAILABLE = False
 
-
 class MainApplication(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -27,7 +26,7 @@ class MainApplication(tk.Tk):
         self.resizable(False, False)
 
         self.controller: Optional[GameController] = None
-        self._current_frame: Optional[tk.Frame] = None
+        self._current_frame: Optional[tk.Widget] = None
         self._loading_screen: Optional[tk.Toplevel] = None
         self.sound_enabled = tk.BooleanVar(value=True)
         self.how_to_play_text_content: str = self._load_how_to_play_text()
@@ -41,6 +40,7 @@ class MainApplication(tk.Tk):
         """Carrega o texto de como jogar de um arquivo .txt."""
         script_dir = os.path.dirname(__file__)
         file_path = os.path.join(script_dir, 'how_to_play.txt')
+
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
@@ -62,6 +62,7 @@ class MainApplication(tk.Tk):
                         padding=[20, 15],
                         focusthickness=0,
                         focuscolor=BUTTON_BG)
+        
         style.map('TButton',
                   background=[('active', BUTTON_HOVER_BG), ('pressed', BUTTON_HOVER_BG)],
                   foreground=[('active', BUTTON_FG)])
@@ -96,6 +97,7 @@ class MainApplication(tk.Tk):
                         borderwidth=1,
                         bordercolor=BORDER_COLOR,
                         padding=[15, 10])
+        
         style.map('Option.TButton',
                   background=[('active', TEXT_ACCENT), ('pressed', TEXT_ACCENT)],
                   foreground=[('active', BG_DARK), ('pressed', BG_DARK)])
@@ -106,6 +108,7 @@ class MainApplication(tk.Tk):
                         font=FONT_DEFAULT,
                         focusthickness=0,
                         indicatorcolor=TEXT_PRIMARY)
+        
         style.map('TCheckbutton',
                   background=[('active', BG_MENU)],
                   foreground=[('active', TEXT_ACCENT)])
@@ -133,7 +136,6 @@ class MainApplication(tk.Tk):
         self._clear_frame()
 
         ttk.Label(self._current_frame, text=GAME_TITLE, style='Title.TLabel').grid(row=0, column=0, pady=(100, 40), sticky="n")
-
         ttk.Button(self._current_frame, text="Jogar", command=self._show_play_options).grid(row=2, column=0, pady=10)
         ttk.Button(self._current_frame, text="Como Jogar", command=self._show_how_to_play).grid(row=3, column=0, pady=10)
         ttk.Button(self._current_frame, text="Configurações", command=self._show_settings_menu).grid(row=4, column=0, pady=10)
@@ -148,9 +150,8 @@ class MainApplication(tk.Tk):
         self._clear_frame()
 
         ttk.Label(self._current_frame, text="Escolha o Modo de Jogo", style='Heading.TLabel').grid(row=0, column=0, pady=(0, 30))
-
-        ttk.Button(self._current_frame, text="🚀 Servidor (Host)", command=lambda: self._trigger_start_game(True, None)).grid(row=1, column=0, pady=15)
-        ttk.Button(self._current_frame, text="💻 Cliente (Entrar)", command=self._prompt_client_ip).grid(row=2, column=0, pady=15)
+        ttk.Button(self._current_frame, text="Servidor (Host)", command=lambda: self._trigger_start_game(True, None)).grid(row=1, column=0, pady=15)
+        ttk.Button(self._current_frame, text="Cliente (Entrar)", command=self._prompt_client_ip).grid(row=2, column=0, pady=15)
         ttk.Button(self._current_frame, text="Voltar", command=self._show_main_menu).grid(row=4, column=0, pady=20)
         
         self._current_frame.grid_rowconfigure(3, weight=1)
@@ -158,13 +159,12 @@ class MainApplication(tk.Tk):
     def _prompt_client_ip(self):
         """Pede ao usuário o IP do servidor antes de iniciar como cliente."""
         self._play_sound("click")
-        server_ip = simpledialog.askstring("Conectar ao Servidor", "Digite o IP do servidor (Ex: 192.168.1.100):",
-                                           parent=self, initialvalue="127.0.0.1")
+        server_ip = simpledialog.askstring("Conectar ao Servidor", "Digite o IP do servidor (Ex: 192.168.1.100):", parent=self, initialvalue="127.0.0.1")
+
         if server_ip:
             self._trigger_start_game(False, server_ip)
         else:
             messagebox.showwarning("Conexão", "IP do servidor não fornecido. Não foi possível iniciar como cliente.")
-
 
     def _show_how_to_play(self):
         self._play_sound("click")
@@ -172,8 +172,7 @@ class MainApplication(tk.Tk):
 
         ttk.Label(self._current_frame, text="Como Jogar: The Resistance", style='Title.TLabel').grid(row=0, column=0, pady=(0, 20), sticky="n")
 
-        how_to_play_text_widget = tk.Text(self._current_frame, wrap=tk.WORD, bg=BG_MENU, fg=TEXT_PRIMARY,
-                                         font=FONT_DEFAULT, relief="flat", padx=20, pady=20)
+        how_to_play_text_widget = tk.Text(self._current_frame, wrap=tk.WORD, bg=BG_MENU, fg=TEXT_PRIMARY, font=FONT_DEFAULT, relief="flat", padx=20, pady=20)
         how_to_play_text_widget.insert(tk.END, self.how_to_play_text_content)
         how_to_play_text_widget.config(state=tk.DISABLED)
         how_to_play_text_widget.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
@@ -192,11 +191,7 @@ class MainApplication(tk.Tk):
         self._clear_frame()
 
         ttk.Label(self._current_frame, text="Configurações", style='Title.TLabel').grid(row=0, column=0, pady=(0, 30), sticky="n")
-
-        ttk.Checkbutton(self._current_frame, text="Ativar Som do Jogo", 
-                        variable=self.sound_enabled, onvalue=True, offvalue=False,
-                        style='TCheckbutton').grid(row=1, column=0, pady=10, sticky="w", padx=50)
-
+        ttk.Checkbutton(self._current_frame, text="Ativar Som do Jogo", variable=self.sound_enabled, onvalue=True, offvalue=False, style='TCheckbutton').grid(row=1, column=0, pady=10, sticky="w", padx=50)
         ttk.Button(self._current_frame, text="Salvar", command=self._save_settings).grid(row=3, column=0, pady=15)
         ttk.Button(self._current_frame, text="Voltar", command=self._show_main_menu).grid(row=4, column=0, pady=10)
         
