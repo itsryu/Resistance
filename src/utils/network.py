@@ -71,11 +71,12 @@ class GameServer(Network):
         self.clients: Dict[int, socket.socket] = {}
         self._client_id_counter: int = 0
         self._lock = threading.Lock()
+        self._max_concurrent_client_setup: int = 3 
+        self._client_setup_semaphore = threading.Semaphore(self._max_concurrent_client_setup)
 
     def start(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(0.5)
-
         try:
             self._socket.bind((self._host, self._port))
             self._socket.listen(5)
@@ -89,19 +90,11 @@ class GameServer(Network):
     def _accept_connections(self):
         while self._is_running:
             try:
-                conn, addr = self._socket.accept() # type: ignore
-                conn.setblocking(True)
-                
-                with self._lock:
-                    self._client_id_counter += 1
-                    player_id = self._client_id_counter
-                    self.clients[player_id] = conn
-                print(f"Conexão aceita de {addr}, atribuído ID de jogador: {player_id}")
-                
-                self._send_message(conn, ConnectAckMessage(player_id=player_id))
-
-                threading.Thread(target=self._receive_messages, args=(conn, addr), daemon=True).start()
-                self._client_connected_callback(player_id)
+                if self._socket is None:
+                    print("Socket do servidor não está inicializado.")
+                    break
+                conn, addr = self._socket.accept()
+                threading.Thread(target=self._handle_new_client_connection, args=(conn, addr), daemon=True).start()
             except socket.timeout:
                 continue
             except socket.error as e:
@@ -112,6 +105,29 @@ class GameServer(Network):
                 print(f"Erro inesperado no _accept_connections: {e}")
                 break
         print("Thread de aceitação de conexões encerrada.")
+
+    def _handle_new_client_connection(self, conn: socket.socket, addr: Tuple[str, int]):
+        """
+        Lida com a configuração inicial de uma nova conexão de cliente.
+        Esta função é executada em uma thread separada e adquire uma permissão do semáforo.
+        """
+        with self._client_setup_semaphore:
+            player_id: Optional[int] = None
+            try:
+                with self._lock:
+                    self._client_id_counter += 1
+                    player_id = self._client_id_counter
+                    self.clients[player_id] = conn
+                print(f"Conexão aceita de {addr}, atribuído ID de jogador: {player_id}")
+                
+                self._send_message(conn, ConnectAckMessage(player_id=player_id))
+
+                threading.Thread(target=self._receive_messages, args=(conn, addr), daemon=True).start()
+                self._client_connected_callback(player_id)
+            except Exception as e:
+                print(f"Erro ao configurar nova conexão de cliente: {e}")
+                if player_id is not None and player_id in self.clients:
+                    self.remove_client(player_id)
 
     def send_to_all_clients(self, message: NetworkMessage):
         disconnected_clients = []
