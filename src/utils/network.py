@@ -77,6 +77,7 @@ class GameServer(Network):
     def start(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(0.5)
+        
         try:
             self._socket.bind((self._host, self._port))
             self._socket.listen(5)

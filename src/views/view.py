@@ -1,13 +1,16 @@
 import tkinter as tk
 
 from tkinter import Canvas, ttk
-from typing import List, Callable, Optional, Dict, Any
+from typing import List, Callable, Optional, Dict, Any, TYPE_CHECKING
 from src.utils.settings import (
     BG_DARK, BG_MEDIUM, BG_LIGHT, TEXT_PRIMARY, TEXT_ACCENT, BORDER_COLOR,
     FONT_TITLE, FONT_SUBTITLE, FONT_DEFAULT, FONT_LOG, FONT_HEADING,
     BUTTON_BG, BUTTON_FG, BUTTON_HOVER_BG, BORDER_RADIUS, GAME_TITLE, MISSION_SIZES
 )
 from src.models.dialogs import TeamSelectionDialog, YesNoDialog, MissionOutcomeDialog, GameOverDetailsDialog
+
+if TYPE_CHECKING:
+    from src.controllers.controller import GameController
 
 
 class GameView:
